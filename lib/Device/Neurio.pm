@@ -1,4 +1,4 @@
-package Neurio;
+package Device::Neurio;
 
 use warnings;
 use strict;
@@ -22,11 +22,11 @@ Device::Neurio - Methods for accessing data collected by a Neurio sensor module.
 
 =head1 VERSION
 
-Version 0.06
+Version 0.02
 
 =cut
 
-our $VERSION = '0.06';
+our $VERSION = '0.02';
 
 #*****************************************************************
 

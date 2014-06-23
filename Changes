@@ -2,15 +2,7 @@ Revision history for Device-Neurio
 
 0.01    June 18, 2014
         First version, contains first 5 API calls available for beta testers
-0.02    June 22, 2014
-        Failed attempt to build a distro
-0.03    June 22, 2014
-        Failed attempt to build a distro
-0.04    June 22, 2014
-        Failed attempt to build a distro
-0.05    June 22, 2014
-        Failed attempt to build a distro
-0.06    June 22, 2014
+0.02    June 23, 2014
         Improved POD documentation
         Added checking for required parameters
         Added support for optional parameters
