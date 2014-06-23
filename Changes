@@ -6,4 +6,6 @@ Revision history for Device-Neurio
         Improved POD documentation
         Added checking for required parameters
         Added support for optional parameters
-
+0.03    June XX, 2014
+        Added pre-requisite of LWP::UserAgent to Makefile.PL
+        Added more detailed error messages on failures

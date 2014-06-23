@@ -9,4 +9,7 @@ WriteMakefile(
     ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM  => 'lib/Device/Neurio.pm', # retrieve abstract from module
        AUTHOR         => 'Kedar Warriner') : ()),
+    PREREQ_PM   => {
+	'LWP::UserAgent' => '0', # or a minimum working version
+    }
 );

@@ -17,5 +17,6 @@ no_index:
   directory:
     - t
     - inc
-requires: {}
-version: 0.02
+requires:
+  LWP::UserAgent: 0
+version: 0.03
