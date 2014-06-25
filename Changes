@@ -9,8 +9,13 @@ Revision history for Device-Neurio
 0.03    June 23, 2014
         Added pre-requisite of LWP::UserAgent to Makefile.PL
         Added more detailed error messages on failures
-0.04    June 24, 2014
+0.04    June 25, 2014
         Added error checking for Granularity
         Added error checking for Frequency in Energy_Stats
         Added general comments to code
         Added details of data structures in POD
+0.05    skipped since I burned this during my initial attempts to upload
+0.06    skipped since I burned this during my initial attempts to upload
+0.07    June 25, 2014
+        Adjusted Makefile.PL with specific requirements
+        

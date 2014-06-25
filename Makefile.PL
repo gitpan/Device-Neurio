@@ -5,11 +5,13 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     NAME              => 'Device::Neurio',
     VERSION_FROM      => 'lib/Device/Neurio.pm', # finds $VERSION
-    PREREQ_PM         => {}, # e.g., Module::Name => 1.1
+    PREREQ_PM   => {
+	  'LWP::UserAgent' => '6.05', # or a minimum working version
+      'JSON'           => '2.90',
+      'MIME::Base64'   => '3.14',
+	  
+    },
     ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM  => 'lib/Device/Neurio.pm', # retrieve abstract from module
        AUTHOR         => 'Kedar Warriner') : ()),
-    PREREQ_PM   => {
-	'LWP::UserAgent' => '0', # or a minimum working version
-    }
 );

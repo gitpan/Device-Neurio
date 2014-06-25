@@ -24,11 +24,11 @@ Device::Neurio - Methods for accessing data collected by a Neurio sensor module.
 
 =head1 VERSION
 
-Version 0.04
+Version 0.07
 
 =cut
 
-our $VERSION = '0.04';
+our $VERSION = '0.07';
 
 #*****************************************************************
 
