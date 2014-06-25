@@ -1,4 +1,4 @@
-package Neurio;
+package Device::Neurio;
 
 use warnings;
 use strict;
@@ -6,11 +6,13 @@ use strict;
 BEGIN
 {
   if ($^O eq "MSWin32"){
-    print "Need to specify windows imports\n";
-    exit(-1);
+    use LWP::UserAgent;
+    use JSON qw(decode_json);
+    use MIME::Base64 (qw(encode_base64));
+    use Data::Dumper;
   } else {
     use LWP::UserAgent;
-    use JSON qw( decode_json );
+    use JSON qw(decode_json);
     use MIME::Base64 (qw(encode_base64));
     use Data::Dumper;
   }
@@ -22,11 +24,11 @@ Device::Neurio - Methods for accessing data collected by a Neurio sensor module.
 
 =head1 VERSION
 
-Version 0.03
+Version 0.04
 
 =cut
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 #*****************************************************************
 
@@ -66,9 +68,10 @@ our $VERSION = '0.03';
 
 =head1 SUBROUTINES/METHODS
 
-=head2 new - the constructor for a Neurio object.
+=head2 new - the constructor for a Neurio object
 
- Creates a new instance to fetch data for a unique Neurio sensor.
+ Creates a new instance which will be able to fetch data from a unique Neurio 
+ sensor.
 
  my $Neurio = Device::Neurio->new($key,$secret,$sensor_id);
 
@@ -77,10 +80,9 @@ our $VERSION = '0.03';
      - $secret    : secret key for the account - Required parameter
      - $sensor_id : sensor ID connected to the account - Required parameter
 
- The Object is returned if successful.
- If one or more parameters is omitted, 0 is returned to indicate failure.
+ Returns a Neurio object if successful.
+ Returns 0 on failure
 =cut
-
 sub new {
     my $class = shift;
     my $self;
@@ -93,7 +95,7 @@ sub new {
     chomp($self->{'base64'});
     
     if ((!defined $self->{'key'}) || (!defined $self->{'secret'}) || (!defined $self->{'sensor_id'})) {
-      print "Key, Secret and Sensor ID are REQUIRED parameters\n";
+      print "Neurio->new(): Key, Secret and Sensor_ID are REQUIRED parameters.\n";
       return 0;
     }
     
@@ -102,9 +104,10 @@ sub new {
     return $self;
 }
 
+
 #*****************************************************************
 
-=head2 connect - open a secure connection to the Neurio server.
+=head2 connect - open a secure connection to the Neurio server
 
  Opens a secure connection via HTTPS to the Neurio server which provides
  access to a set of API commands to access the sensor data.
@@ -113,16 +116,16 @@ sub new {
  
  This method accepts no parameters
  
- Returns 1 on success and 0 on failure.
+ Returns 1 on success 
+ Returns 0 on failure
 =cut
-
 sub connect {
 	my $self         = shift;
 	my $access_token = '';
 	
     # Submit request for authentiaction token.
-    my $response = $self->{'ua'}->post( 'https://api-staging.neur.io/v1/oauth2/token',  
-          { basic_authentication =>  $self->{'base64'},
+    my $response = $self->{'ua'}->post('https://api-staging.neur.io/v1/oauth2/token',
+          { basic_authentication => $self->{'base64'},
         	Content_Type         => 'application/x-www-form-urlencoded',
         	grant_type           => 'client_credentials', 
         	client_id            => $self->{'key'},
@@ -136,37 +139,60 @@ sub connect {
       $self->{'access_token'} = $1;
       return 1;
     } else {
-      print "Failed to connect\n";
+      print "Neurio->connect(): Failed to connect.\n";
+      print $response->content."\n\n";
       return 0;
     }
 }
+
 
 #*****************************************************************
 
 =head2 fetch_Recent_Live - Fetch recent sensor samples
 
  Retrieves recent sensor readings from the Neurio server.
+ The values represent the sum of all phases.
 
    $Neurio->fetch_Recent_Live($last);
  
    This method accepts the following parameters:
       $last - yyyy-mm-ddThh:mm:ssZ - Optional parameter
+      
+      If no value is specified for $last, a default of 2 minutes is used.
  
- Return value is a Perl data structure containing all the raw data
+ Returns an array of Perl data structures on success
+ $VAR1 = [
+          {
+            'generationEnergy' => 3716166644,
+            'timestamp' => '2014-06-24T11:08:00.000Z',
+            'consumptionEnergy' => 6762651207,
+            'generationPower' => 564,
+            'consumptionPower' => 821
+          },
+          ...
+         ]
+ Returns 0 on failure
 =cut
-
 sub fetch_Recent_Live {
     my ($self,$last) = @_;
     my ($url,$response,$decoded_response);
     
+    # if optional parameter is defined, add it
     if (defined $last) {
       $url = "https://api-staging.neur.io/v1/samples/live?sensorId=".$self->{'sensor_id'}."&last=$last";
     } else {
       $url = "https://api-staging.neur.io/v1/samples/live?sensorId=".$self->{'sensor_id'};
     }
-    $response         = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
-    $decoded_response = decode_json($response->content);
-
+    $response = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
+    
+    if ($response->is_success) {
+      $decoded_response = decode_json($response->content);
+    } else {
+      print "Neurio->fetch_Recent_Live(): Response from server is not valid\n";
+      print "  \"".$response->content."\"\n\n";
+      $decoded_response = 0;
+    }
+    
     return $decoded_response;
 }
 
@@ -176,30 +202,48 @@ sub fetch_Recent_Live {
 =head2 fetch_Last_Live - Fetch the last live sensor sample
 
  Retrieves the last live sensor reading from the Neurio server.  
+ The values represent the sum of all phases.
 
    $Neurio->fetch_Last_Live();
 
    This method accepts no parameters
  
- Return value is a Perl data structure containing all the raw data
+ Returns a Perl data structure on success:
+ $VAR1 = {
+          'generationEnergy' => 3716027450,
+          'timestamp' => '2014-06-24T11:03:43.000Z',
+          'consumptionEnergy' => 6762445671,
+          'generationPower' => 542,
+          'consumptionPower' => 800
+        };
+ Returns 0 on failure
+ 
 =cut
-
 sub fetch_Last_Live {
     my $self             = shift;
     my ($url,$response,$decoded_response);
     
-    $url              = "https://api-staging.neur.io/v1/samples/live/last?sensorId=".$self->{'sensor_id'};
-	$response         = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
-    $decoded_response = decode_json($response->content);
-     
+    $url      = "https://api-staging.neur.io/v1/samples/live/last?sensorId=".$self->{'sensor_id'};
+	$response = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
+    
+    if ($response->is_success) {
+      $decoded_response = decode_json($response->content);
+    } else {
+      print "Neurio->fetch_Last_Live(): Response from server is not valid\n";
+      print "  \"".$response->content."\"\n\n";
+      $decoded_response = 0;
+    }
+    
     return $decoded_response;
 }
 
+
 #*****************************************************************
 
-=head2 fetch_Samples - Fetch sensor samples from the Neurio server.
+=head2 fetch_Samples - Fetch sensor samples from the Neurio server
 
  Retrieves sensor readings within the parameters specified.
+ The values represent the sum of all phases.
 
  $Neurio->fetch_Samples($start,$granularity,$end,$frequency);
 
@@ -207,41 +251,67 @@ sub fetch_Last_Live {
      - start       : yyyy-mm-ddThh:mm:ssZ - Required
      - granularity : seconds|minutes|hours|days - Required
      - end         : yyyy-mm-ddThh:mm:ssZ - Optional
-     - freqnecy    : an integer - Optional
+     - freqnecy    : if the granularity specified is ‘minutes’, the frequency 
+                     must be a multiple of 5 - Optional
  
- Return value is a Perl data structure containing all the raw data
- On failure, 0 is returned
+ Returns an array of Perl data structures on success
+ $VAR1 = [
+          {
+            'generationEnergy' => 3568948578,
+            'timestamp' => '2014-06-21T19:00:00.000Z',
+            'consumptionEnergy' => 6487889194,
+            'generationPower' => 98,
+            'consumptionPower' => 240
+          },
+          ...
+         ]
+ Returns 0 on failure
 =cut
-
 sub fetch_Samples {
     my ($self,$start,$granularity,$end,$frequency) = @_;
     my ($url,$response,$decoded_response);
     
     $url = "https://api-staging.neur.io/v1/samples?sensorId=".$self->{'sensor_id'}."&start=$start&granularity=$granularity";
-    
+
+    # make sure $start and $granularity are defined
     if ((!defined $start) || (!defined $granularity)) {
-      print "Start and Granularity are required parameters\n";
+      print "Neurio->fetch_Full_Samples(): \$start and \$granularity are required parameters\n\n";
       return 0;
     }
+    # make sure $granularity is one of the correct values
+    if (!($granularity =~ /[seconds|minutes|hours|days]/)) {
+      print "Neurio->fetch_Full_Samples(): Only values of 'seconds, minutes, hours or days' are supported for \$granularity\n\n";
+      return 0;
+    }
+    # if optional parameter is defined, add it
     if (defined $end) {
       $url = $url . "&end=$end";
     }
+    # if optional parameter is defined, add it
     if (defined $frequency) {
       $url = $url . "&frequency=$frequency";
     }
     
-	$response         = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
-    $decoded_response = decode_json($response->content);
-     
+	$response = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
+	
+    if ($response->is_success) {
+      $decoded_response = decode_json($response->content);
+    } else {
+      print "Neurio->fetch_Samples(): Response from server is not valid\n";
+      print "  \"".$response->content."\"\n\n";
+      $decoded_response = 0;
+    }
+    
     return $decoded_response;
 }
 
+
 #*****************************************************************
 
-=head2 fetch_Full_Samples - Fetches full samples for all phases.
+=head2 fetch_Full_Samples - Fetches full samples for all phases
 
- Retrieves full sensor readings including all phases within the parameters 
- specified.
+ Retrieves full sensor readings including data for each individual phase within 
+ the parameters specified.
 
  $Neurio->fetch_Full_Samples($start,$granularity,$end,$frequency);
 
@@ -251,71 +321,143 @@ sub fetch_Samples {
      - end         : yyyy-mm-ddThh:mm:ssZ - Optional
      - freqnecy    : an integer - Optional
  
- Return value is a Perl data structure containing all the raw data
- On failure, 0 is returned
+ Returns an array of Perl data structures on success
+ $VAR1 = [
+          {
+            'timestamp' => '2014-06-16T19:20:21.000Z',
+            'channelSamples' => [
+                                  {
+                                    'voltage' => '123.19',
+                                    'power' => 129,
+                                    'name' => '1',
+                                    'energyExported' => 27,
+                                    'channelType' => 'phase_a',
+                                    'energyImported' => 2682910899,
+                                    'reactivePower' => 41
+                                  },
+                                  {
+                                    'voltage' => '123.94',
+                                    'power' => 199,
+                                    'name' => '2',
+                                    'energyExported' => 6,
+                                    'channelType' => 'phase_b',
+                                    'energyImported' => 3296564362,
+                                    'reactivePower' => -45
+                                  },
+                                  {
+                                    'voltage' => '123.57',
+                                    'power' => 327,
+                                    'name' => '3',
+                                    'energyExported' => 10,
+                                    'channelType' => 'consumption',
+                                    'energyImported' => 5979475235,
+                                    'reactivePower' => -4
+                                  }
+                                ]
+          },
+          ...
+         ]
+ Returns 0 on failure
 =cut
-
 sub fetch_Full_Samples {
     my ($self,$start,$granularity,$end,$frequency) = @_;
     my ($url,$response,$decoded_response);
     
     $url = "https://api-staging.neur.io/v1/samples/full?sensorId=".$self->{'sensor_id'}."&start=$start&granularity=$granularity";
 
+    # make sure $start and $granularity are defined
     if ((!defined $start) || (!defined $granularity)) {
-      print "Start and Granularity are required parameters\n";
+      print "Neurio->fetch_Full_Samples(): \$start and \$granularity are required parameters\n\n";
       return 0;
     }
+    # make sure $granularity is one of the correct values
+    if (!($granularity =~ /[seconds|minutes|hours|days]/)) {
+      print "Neurio->fetch_Full_Samples(): Only values of 'seconds, minutes, hours or days' are supported for \$granularity\n\n";
+      return 0;
+    }
+    # if optional parameter is defined, add it
     if (defined $end) {
       $url = $url . "&end=$end";
     }
+    # if optional parameter is defined, add it
     if (defined $frequency) {
       $url = $url . "&frequency=$frequency";
     }
     
-	$response         = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
-    $decoded_response = decode_json($response->content);
-     
+	$response  = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
+    
+    if ($response->is_success) {
+      $decoded_response = decode_json($response->content);
+    } else {
+      print "Neurio->fetch_Full_Samples(): Response from server is not valid\n";
+      print "  \"".$response->content."\"\n\n";
+      $decoded_response = 0;
+    }
+    
     return $decoded_response;
 }
 
+
 #*****************************************************************
 
-=head2 fetch_Energy_Stats - Fetches energy statistics.
+=head2 fetch_Energy_Stats - Fetches energy statistics
 
  Retrieves energy statistics within the parameters specified.
+ The values represent the sum of all phases.
 
    $Neurio->fetch_Energy_Stats($start,$granularity,$end,$frequency);
 
    This method accepts the following parameters:
      - start       : yyyy-mm-ddThh:mm:ssZ - Required
-     - granularity : seconds|minutes|hours|days - Required
+     - granularity : minutes|hours|days|months - Required
      - end         : yyyy-mm-ddThh:mm:ssZ - Optional
      - freqnecy    : an integer - Optional
  
- Return value is a Perl data structure containing all the raw data
- On failure, 0 is returned
+ Returns a Perl data structure containing all the raw data
+ Returns 0 on failure
 =cut
-
 sub fetch_Energy_Stats {
     my ($self,$start,$granularity,$end,$frequency) = @_;
     my ($url,$response,$decoded_response);
 
     $url = "https://api-staging.neur.io/v1/samples/stats?sensorId=".$self->{'sensor_id'}."&start=$start&granularity=$granularity";
 
+    # make sure $start and $granularity are defined
     if ((!defined $start) || (!defined $granularity)) {
-      print "Start and Granularity are required parameters\n";
+      print "Neurio->fetch_Energy_Stats(): \$start and \$granularity are required parameters\n\n";
       return 0;
     }
+    # make sure that frequqncy is a multiple of 5 if $granularity is in minutes
+    if (($granularity eq 'minutes') and defined $frequency) {
+      if (eval($frequency%5) != 0) {
+        print "Neurio->fetch_Full_Samples(): Only multiples of 5 are supported for \$frequency when \$granularity is in minutes\n\n";
+        return 0;
+      }
+    }
+    # make sure $granularity is one of the correct values
+    if (!($granularity ~~ ['minutes','hours','days','months'])) {
+      print "Neurio->fetch_Full_Samples(): Only values of 'minutes, hours, days or months' are supported for \$granularity\n\n";
+      return 0;
+    }
+    # if optional parameter is defined, add it
     if (defined $end) {
       $url = $url . "&end=$end";
     }
+    # if optional parameter is defined, add it
     if (defined $frequency) {
       $url = $url . "&frequency=$frequency";
     }
-
+    
 	$response         = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
-    $decoded_response = decode_json($response->content);
-     
+    
+    if ($response->is_success) {
+      $decoded_response = decode_json($response->content);
+    } else {
+      print "Neurio->fetch_Energy_Stats(): Response from server is not valid\n";
+      print "  \"".$response->content."\"\n\n";
+      $decoded_response = 0;
+    }
+    
     return $decoded_response;
 }
 
@@ -324,12 +466,12 @@ sub fetch_Energy_Stats {
 
 =head1 AUTHOR
 
-Kedar Warriner, C<kedarwarriner at gmail.com>
+Kedar Warriner, C<kedar at cpan.org>
 
 =head1 BUGS
 
  Please report any bugs or feature requests to C<bug-device-Neurio at rt.cpan.org>
- or through the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Device-Neurio>
+ or through the web interface at http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Device-Neurio
  I will be notified, and then you'll automatically be notified of progress on 
  your bug as I make changes.
 
@@ -373,7 +515,7 @@ L<http://search.cpan.org/dist/Device-Neurio/>
 
 =head1 LICENSE AND COPYRIGHT
 
- Copyright 2014 Kedar Warriner.
+ Copyright 2014 Kedar Warriner <kedar at cpan.org>.
 
  This program is free software; you can redistribute it and/or modify it
  under the terms of either: the GNU General Public License as published

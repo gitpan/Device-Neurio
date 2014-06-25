@@ -6,6 +6,11 @@ Revision history for Device-Neurio
         Improved POD documentation
         Added checking for required parameters
         Added support for optional parameters
-0.03    June XX, 2014
+0.03    June 23, 2014
         Added pre-requisite of LWP::UserAgent to Makefile.PL
         Added more detailed error messages on failures
+0.04    June 24, 2014
+        Added error checking for Granularity
+        Added error checking for Frequency in Energy_Stats
+        Added general comments to code
+        Added details of data structures in POD

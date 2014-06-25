@@ -9,7 +9,7 @@ use strict;
 use warnings;
 
 use Test::More tests => 1;
-BEGIN { use_ok('Device::Neurio') };
+use_ok('Device::Neurio');
 
 #########################
 
