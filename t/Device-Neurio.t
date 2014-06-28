@@ -11,8 +11,9 @@ use warnings;
 use Test::More tests => 1;
 use_ok('Device::Neurio');
 
+
+# The only test performed here is to verity that the module can be imported.
+# Any more detailed tests require a connection to the Neurio server as well
+# as the key, secret and sensor ID for a particular sensor
+
 #########################
-
-# Insert your test code below, the Test::More module is use()ed here so read
-# its man page ( perldoc Test::More ) for help writing this test script.
-

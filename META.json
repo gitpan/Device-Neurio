@@ -1,5 +1,5 @@
 {
-   "abstract" : "Methods for accessing data collected by a Neurio sensor module.",
+   "abstract" : "Methods for wrapping the Neurio API calls so that they are accessible via Perl",
    "author" : [
       "Kedar Warriner"
    ],
@@ -39,5 +39,5 @@
       }
    },
    "release_status" : "stable",
-   "version" : "0.07"
+   "version" : "0.08"
 }

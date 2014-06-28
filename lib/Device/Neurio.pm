@@ -1,7 +1,29 @@
-package Device::Neurio;
+package Neurio;
 
 use warnings;
 use strict;
+
+require Exporter;
+
+our @ISA = qw(Exporter);
+
+# Items to export into callers namespace by default. Note: do not export
+# names by default without a very good reason. Use EXPORT_OK instead.
+# Do not simply export all your public functions/methods/constants.
+
+# This allows declaration	use Device::NeurioTools ':all';
+# If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
+# will save memory.
+our %EXPORT_TAGS = ( 'all' => [ qw(
+    new connect fetch_Recent_Live fetch_Last_Live fetch_Samples fetch_Full_Samples fetch_Energy_Stats
+) ] );
+
+our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
+
+our @EXPORT = qw( $EXPORT_TAGS{'all'}
+	
+);
+
 
 BEGIN
 {
@@ -20,15 +42,15 @@ BEGIN
 
 =head1 NAME
 
-Device::Neurio - Methods for accessing data collected by a Neurio sensor module.
+Device::Neurio - Methods for wrapping the Neurio API calls so that they are accessible via Perl
 
 =head1 VERSION
 
-Version 0.07
+Version 0.08
 
 =cut
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 #*****************************************************************
 
@@ -50,7 +72,7 @@ our $VERSION = '0.07';
 
  The module is written entirely in Perl and has been tested on Raspbian Linux.
 
- Here is some sample code:
+=head1 SAMPLE CODE
 
     use Device::Neurio;
 
@@ -65,6 +87,12 @@ our $VERSION = '0.07';
     print Dumper($data);
 
     undef $Neurio;
+
+
+=head2 EXPORT
+
+ All by default.
+
 
 =head1 SUBROUTINES/METHODS
 
@@ -251,8 +279,8 @@ sub fetch_Last_Live {
      - start       : yyyy-mm-ddThh:mm:ssZ - Required
      - granularity : seconds|minutes|hours|days - Required
      - end         : yyyy-mm-ddThh:mm:ssZ - Optional
-     - freqnecy    : if the granularity specified is ‘minutes’, the frequency 
-                     must be a multiple of 5 - Optional
+     - frequency   : if the granularity is specified as 'minutes', then the 
+                     frequency must be a multiple of 5 - Optional
  
  Returns an array of Perl data structures on success
  $VAR1 = [
@@ -319,7 +347,7 @@ sub fetch_Samples {
      - start       : yyyy-mm-ddThh:mm:ssZ - Required
      - granularity : seconds|minutes|hours|days - Required
      - end         : yyyy-mm-ddThh:mm:ssZ - Optional
-     - freqnecy    : an integer - Optional
+     - frequency   : an integer - Optional
  
  Returns an array of Perl data structures on success
  $VAR1 = [
@@ -411,7 +439,7 @@ sub fetch_Full_Samples {
      - start       : yyyy-mm-ddThh:mm:ssZ - Required
      - granularity : minutes|hours|days|months - Required
      - end         : yyyy-mm-ddThh:mm:ssZ - Optional
-     - freqnecy    : an integer - Optional
+     - frequency   : an integer - Optional
  
  Returns a Perl data structure containing all the raw data
  Returns 0 on failure
