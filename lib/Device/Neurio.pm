@@ -20,9 +20,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
-our @EXPORT = qw( $EXPORT_TAGS{'all'}
-	
-);
+our @EXPORT = qw( $EXPORT_TAGS{'all'});
 
 
 BEGIN
@@ -46,11 +44,11 @@ Device::Neurio - Methods for wrapping the Neurio API calls so that they are acce
 
 =head1 VERSION
 
-Version 0.08
+Version 0.09
 
 =cut
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 #*****************************************************************
 
@@ -104,9 +102,9 @@ our $VERSION = '0.08';
  my $Neurio = Device::Neurio->new($key,$secret,$sensor_id);
 
    This method accepts the following parameters:
-     - $key       : unique key for the account - Required parameter
-     - $secret    : secret key for the account - Required parameter
-     - $sensor_id : sensor ID connected to the account - Required parameter
+     - $key       : unique key for the account - Required 
+     - $secret    : secret key for the account - Required 
+     - $sensor_id : sensor ID connected to the account - Required 
 
  Returns a Neurio object if successful.
  Returns 0 on failure
@@ -184,7 +182,7 @@ sub connect {
    $Neurio->fetch_Recent_Live($last);
  
    This method accepts the following parameters:
-      $last - yyyy-mm-ddThh:mm:ssZ - Optional parameter
+      $last - time of last sample received (yyyy-mm-ddThh:mm:ssZ) - Optional
       
       If no value is specified for $last, a default of 2 minutes is used.
  
@@ -248,7 +246,7 @@ sub fetch_Recent_Live {
  
 =cut
 sub fetch_Last_Live {
-    my $self             = shift;
+    my $self = shift;
     my ($url,$response,$decoded_response);
     
     $url      = "https://api-staging.neur.io/v1/samples/live/last?sensorId=".$self->{'sensor_id'};
@@ -273,7 +271,7 @@ sub fetch_Last_Live {
  Retrieves sensor readings within the parameters specified.
  The values represent the sum of all phases.
 
- $Neurio->fetch_Samples($start,$granularity,$end,$frequency);
+ $Neurio->fetch_Samples($start,$granularity,$end,$frequency,$perPage,$page);
 
    This method accepts the following parameters:
      - start       : yyyy-mm-ddThh:mm:ssZ - Required
@@ -281,6 +279,8 @@ sub fetch_Last_Live {
      - end         : yyyy-mm-ddThh:mm:ssZ - Optional
      - frequency   : if the granularity is specified as 'minutes', then the 
                      frequency must be a multiple of 5 - Optional
+     - perPage     : number of results per page - Optional
+     - page        : page number to return - Optional
  
  Returns an array of Perl data structures on success
  $VAR1 = [
@@ -296,15 +296,22 @@ sub fetch_Last_Live {
  Returns 0 on failure
 =cut
 sub fetch_Samples {
-    my ($self,$start,$granularity,$end,$frequency) = @_;
+    my ($self,$start,$granularity,$end,$frequency,$perPage,$page) = @_;
     my ($url,$response,$decoded_response);
     
     $url = "https://api-staging.neur.io/v1/samples?sensorId=".$self->{'sensor_id'}."&start=$start&granularity=$granularity";
-
+    
     # make sure $start and $granularity are defined
     if ((!defined $start) || (!defined $granularity)) {
       print "Neurio->fetch_Full_Samples(): \$start and \$granularity are required parameters\n\n";
       return 0;
+    }
+    # make sure that frequqncy is a multiple of 5 if $granularity is in minutes
+    if (($granularity eq 'minutes') and defined $frequency) {
+      if (eval($frequency%5) != 0) {
+        print "Neurio->fetch_Samples(): Only multiples of 5 are supported for \$frequency when \$granularity is in minutes\n\n";
+        return 0;
+      }
     }
     # make sure $granularity is one of the correct values
     if (!($granularity =~ /[seconds|minutes|hours|days]/)) {
@@ -318,6 +325,14 @@ sub fetch_Samples {
     # if optional parameter is defined, add it
     if (defined $frequency) {
       $url = $url . "&frequency=$frequency";
+    }
+    # if optional parameter is defined, add it
+    if (defined $perPage) {
+      $url = $url . "&perPage=$perPage";
+    }
+    # if optional parameter is defined, add it
+    if (defined $page) {
+      $url = $url . "&page=$page";
     }
     
 	$response = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
@@ -341,13 +356,15 @@ sub fetch_Samples {
  Retrieves full sensor readings including data for each individual phase within 
  the parameters specified.
 
- $Neurio->fetch_Full_Samples($start,$granularity,$end,$frequency);
+ $Neurio->fetch_Full_Samples($start,$granularity,$end,$frequency,$perPage,$page);
 
    This method accepts the following parameters:
      - start       : yyyy-mm-ddThh:mm:ssZ - Required
      - granularity : seconds|minutes|hours|days - Required
      - end         : yyyy-mm-ddThh:mm:ssZ - Optional
      - frequency   : an integer - Optional
+     - perPage     : number of results per page - Optional
+     - page        : page number to return - Optional
  
  Returns an array of Perl data structures on success
  $VAR1 = [
@@ -388,7 +405,7 @@ sub fetch_Samples {
  Returns 0 on failure
 =cut
 sub fetch_Full_Samples {
-    my ($self,$start,$granularity,$end,$frequency) = @_;
+    my ($self,$start,$granularity,$end,$frequency,$perPage,$page) = @_;
     my ($url,$response,$decoded_response);
     
     $url = "https://api-staging.neur.io/v1/samples/full?sensorId=".$self->{'sensor_id'}."&start=$start&granularity=$granularity";
@@ -410,6 +427,14 @@ sub fetch_Full_Samples {
     # if optional parameter is defined, add it
     if (defined $frequency) {
       $url = $url . "&frequency=$frequency";
+    }
+    # if optional parameter is defined, add it
+    if (defined $perPage) {
+      $url = $url . "&perPage=$perPage";
+    }
+    # if optional parameter is defined, add it
+    if (defined $page) {
+      $url = $url . "&page=$page";
     }
     
 	$response  = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
@@ -433,19 +458,22 @@ sub fetch_Full_Samples {
  Retrieves energy statistics within the parameters specified.
  The values represent the sum of all phases.
 
-   $Neurio->fetch_Energy_Stats($start,$granularity,$end,$frequency);
+   $Neurio->fetch_Energy_Stats($start,$granularity,$end,$frequency,$perPage,$page);
 
    This method accepts the following parameters:
      - start       : yyyy-mm-ddThh:mm:ssZ - Required
      - granularity : minutes|hours|days|months - Required
      - end         : yyyy-mm-ddThh:mm:ssZ - Optional
-     - frequency   : an integer - Optional
+     - frequency   : if the granularity is specified as 'minutes', then the 
+                     frequency must be a multiple of 5 - Optional
+     - perPage     : number of results per page - Optional
+     - page        : page number to return - Optional
  
  Returns a Perl data structure containing all the raw data
  Returns 0 on failure
 =cut
 sub fetch_Energy_Stats {
-    my ($self,$start,$granularity,$end,$frequency) = @_;
+    my ($self,$start,$granularity,$end,$frequency,$perPage,$page) = @_;
     my ($url,$response,$decoded_response);
 
     $url = "https://api-staging.neur.io/v1/samples/stats?sensorId=".$self->{'sensor_id'}."&start=$start&granularity=$granularity";
@@ -458,7 +486,7 @@ sub fetch_Energy_Stats {
     # make sure that frequqncy is a multiple of 5 if $granularity is in minutes
     if (($granularity eq 'minutes') and defined $frequency) {
       if (eval($frequency%5) != 0) {
-        print "Neurio->fetch_Full_Samples(): Only multiples of 5 are supported for \$frequency when \$granularity is in minutes\n\n";
+        print "Neurio->fetch_Energy_Stats(): Only multiples of 5 are supported for \$frequency when \$granularity is in minutes\n\n";
         return 0;
       }
     }
@@ -474,6 +502,14 @@ sub fetch_Energy_Stats {
     # if optional parameter is defined, add it
     if (defined $frequency) {
       $url = $url . "&frequency=$frequency";
+    }
+    # if optional parameter is defined, add it
+    if (defined $perPage) {
+      $url = $url . "&perPage=$perPage";
+    }
+    # if optional parameter is defined, add it
+    if (defined $page) {
+      $url = $url . "&page=$page";
     }
     
 	$response         = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});

@@ -22,4 +22,6 @@ Revision history for Device-Neurio
         Updated README
         Updated Device-Neurio.t with only the 'use' test
         Added EXPORT section
+0.09    June 29, 2014
+        Added support for page and perPage parameters
         
