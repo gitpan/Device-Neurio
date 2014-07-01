@@ -1,4 +1,4 @@
-package Neurio;
+package Device::Neurio;
 
 use warnings;
 use strict;
@@ -22,7 +22,6 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw( $EXPORT_TAGS{'all'});
 
-
 BEGIN
 {
   if ($^O eq "MSWin32"){
@@ -38,17 +37,18 @@ BEGIN
   }
 }
 
+
 =head1 NAME
 
 Device::Neurio - Methods for wrapping the Neurio API calls so that they are accessible via Perl
 
 =head1 VERSION
 
-Version 0.09
+Version 0.10
 
 =cut
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 
 #*****************************************************************
 
@@ -69,6 +69,8 @@ our $VERSION = '0.09';
  your house.
 
  The module is written entirely in Perl and has been tested on Raspbian Linux.
+
+ All date/time values are specified using ISO8601 format (yyyy-mm-ddThh:mm:ssZ)
 
 =head1 SAMPLE CODE
 
@@ -183,6 +185,7 @@ sub connect {
  
    This method accepts the following parameters:
       $last - time of last sample received (yyyy-mm-ddThh:mm:ssZ) - Optional
+              specified using ISO8601 format
       
       If no value is specified for $last, a default of 2 minutes is used.
  
@@ -275,8 +278,10 @@ sub fetch_Last_Live {
 
    This method accepts the following parameters:
      - start       : yyyy-mm-ddThh:mm:ssZ - Required
+                     specified using ISO8601 format
      - granularity : seconds|minutes|hours|days - Required
      - end         : yyyy-mm-ddThh:mm:ssZ - Optional
+                     specified using ISO8601 format
      - frequency   : if the granularity is specified as 'minutes', then the 
                      frequency must be a multiple of 5 - Optional
      - perPage     : number of results per page - Optional
@@ -360,8 +365,10 @@ sub fetch_Samples {
 
    This method accepts the following parameters:
      - start       : yyyy-mm-ddThh:mm:ssZ - Required
+                     specified using ISO8601 format
      - granularity : seconds|minutes|hours|days - Required
      - end         : yyyy-mm-ddThh:mm:ssZ - Optional
+                     specified using ISO8601 format
      - frequency   : an integer - Optional
      - perPage     : number of results per page - Optional
      - page        : page number to return - Optional
@@ -462,8 +469,10 @@ sub fetch_Full_Samples {
 
    This method accepts the following parameters:
      - start       : yyyy-mm-ddThh:mm:ssZ - Required
+                     specified using ISO8601 format
      - granularity : minutes|hours|days|months - Required
      - end         : yyyy-mm-ddThh:mm:ssZ - Optional
+                     specified using ISO8601 format
      - frequency   : if the granularity is specified as 'minutes', then the 
                      frequency must be a multiple of 5 - Optional
      - perPage     : number of results per page - Optional
@@ -545,7 +554,6 @@ Kedar Warriner, C<kedar at cpan.org>
  You can find documentation for this module with the perldoc command.
 
   perldoc Device::Neurio
-
 
  You can also look for information at:
 

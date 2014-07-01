@@ -14,3 +14,6 @@ WriteMakefile(
       (ABSTRACT_FROM  => 'lib/Device/Neurio.pm', # retrieve abstract from module
        AUTHOR         => 'Kedar Warriner') : ()),
 );
+
+#example of how to get module version
+#perl -MDateTime::Format::ISO8601 -e 'print "$DateTime::Format::ISO8601::VERSION\n"'

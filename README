@@ -1,4 +1,4 @@
-Device-Neurio version 0.09
+Device-Neurio version 0.10
 ==========================
 
 This module is designed to allow interaction with the Neurio API via Perl.
