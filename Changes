@@ -26,4 +26,9 @@ Revision history for Device-Neurio
         Added support for page and perPage parameters
 0.10    July 01, 2014
         Added references to documentation for ISO8601 for time specification
+0.11    July 19, 2014
+        Update documentation
+        Added option for debug printouts
+        Moved all the URLs to $self
+        Added a function to dump the contents of $self
         

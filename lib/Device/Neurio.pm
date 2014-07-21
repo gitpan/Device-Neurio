@@ -2,6 +2,7 @@ package Device::Neurio;
 
 use warnings;
 use strict;
+use 5.006_001; 
 
 require Exporter;
 
@@ -14,24 +15,24 @@ our @ISA = qw(Exporter);
 # This allows declaration	use Device::NeurioTools ':all';
 # If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
 # will save memory.
+
 our %EXPORT_TAGS = ( 'all' => [ qw(
     new connect fetch_Recent_Live fetch_Last_Live fetch_Samples fetch_Full_Samples fetch_Energy_Stats
 ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
-
 our @EXPORT = qw( $EXPORT_TAGS{'all'});
 
 BEGIN
 {
   if ($^O eq "MSWin32"){
     use LWP::UserAgent;
-    use JSON qw(decode_json);
+    use JSON qw(decode_json encode_json);
     use MIME::Base64 (qw(encode_base64));
     use Data::Dumper;
   } else {
     use LWP::UserAgent;
-    use JSON qw(decode_json);
+    use JSON qw(decode_json encode_json);
     use MIME::Base64 (qw(encode_base64));
     use Data::Dumper;
   }
@@ -40,15 +41,16 @@ BEGIN
 
 =head1 NAME
 
-Device::Neurio - Methods for wrapping the Neurio API calls so that they are accessible via Perl
+Device::Neurio - Methods for wrapping the Neurio API calls so that they are 
+                 accessible via Perl
 
 =head1 VERSION
 
-Version 0.10
+Version 0.11
 
 =cut
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 #*****************************************************************
 
@@ -68,7 +70,7 @@ our $VERSION = '0.10';
  (key, secret, sensor_id) as well as an Energy Aware Neurio sensor installed in
  your house.
 
- The module is written entirely in Perl and has been tested on Raspbian Linux.
+ The module is written entirely in Perl and has been developped on Raspbian Linux.
 
  All date/time values are specified using ISO8601 format (yyyy-mm-ddThh:mm:ssZ)
 
@@ -76,17 +78,17 @@ our $VERSION = '0.10';
 
     use Device::Neurio;
 
-    my $Neurio = Device::Neurio->new($key,$secret,$sensor_id);
+    $my_Neurio = Device::Neurio->new($key,$secret,$sensor_id,$debug);
 
-    $Neurio->connect();
+    $my_Neurio->connect();
   
     $data = $my_Neurio->fetch_Last_Live();
-    $data = $my_Neurio->fetch_Recent_Live();
+    print $data->{'consumptionPower'}
+
     $data = $my_Neurio->fetch_Recent_Live("2014-06-18T19:20:21Z");
+    print $data->[0]->{'consumptionPower'}
 
-    print Dumper($data);
-
-    undef $Neurio;
+    undef $my_Neurio;
 
 
 =head2 EXPORT
@@ -101,31 +103,46 @@ our $VERSION = '0.10';
  Creates a new instance which will be able to fetch data from a unique Neurio 
  sensor.
 
- my $Neurio = Device::Neurio->new($key,$secret,$sensor_id);
+ my $Neurio = Device::Neurio->new($key, $secret, $sensor_id, $debug);
 
    This method accepts the following parameters:
      - $key       : unique key for the account - Required 
      - $secret    : secret key for the account - Required 
      - $sensor_id : sensor ID connected to the account - Required 
+     - $debug     : enable or disable debug messages (disabled by default - Optional)
 
  Returns a Neurio object if successful.
  Returns 0 on failure
+ 
 =cut
+
 sub new {
     my $class = shift;
     my $self;
-
+    
     $self->{'ua'}        = LWP::UserAgent->new();
     $self->{'key'}       = shift;
     $self->{'secret'}    = shift;
     $self->{'sensor_id'} = shift;
+    $self->{'debug'}     = shift;
     $self->{'base64'}    = encode_base64($self->{'key'}.":".$self->{'secret'});
     chomp($self->{'base64'});
     
+    if (!defined $self->{'debug'}) {
+      $self->{'debug'} = 0;
+    }
+    
     if ((!defined $self->{'key'}) || (!defined $self->{'secret'}) || (!defined $self->{'sensor_id'})) {
-      print "Neurio->new(): Key, Secret and Sensor_ID are REQUIRED parameters.\n";
+      print "\nNeurio->new(): Key, Secret and Sensor_ID are REQUIRED parameters.\n";
       return 0;
     }
+    
+    $self->{'base_url'}         = "https://api-staging.neur.io/v1/samples";
+    $self->{'Recent_Live_url'}  = $self->{'base_url'}."/live?sensorId=".$self->{'sensor_id'};
+    $self->{'Last_Live_url'}    = $self->{'base_url'}."/live/last?sensorId=".$self->{'sensor_id'};
+    $self->{'Samples_url'}      = $self->{'base_url'}."?sensorId=".$self->{'sensor_id'};
+    $self->{'Full_Samples_url'} = $self->{'base_url'}."/full?sensorId=".$self->{'sensor_id'};
+    $self->{'Energy_Stats_url'} = $self->{'base_url'}."/stats?sensorId=".$self->{'sensor_id'};
     
     bless $self, $class;
     
@@ -146,7 +163,9 @@ sub new {
  
  Returns 1 on success 
  Returns 0 on failure
+ 
 =cut
+
 sub connect {
 	my $self         = shift;
 	my $access_token = '';
@@ -167,7 +186,7 @@ sub connect {
       $self->{'access_token'} = $1;
       return 1;
     } else {
-      print "Neurio->connect(): Failed to connect.\n";
+      print "\nNeurio->connect(): Failed to connect.\n";
       print $response->content."\n\n";
       return 0;
     }
@@ -201,23 +220,25 @@ sub connect {
           ...
          ]
  Returns 0 on failure
+ 
 =cut
+
 sub fetch_Recent_Live {
     my ($self,$last) = @_;
     my ($url,$response,$decoded_response);
-    
+
     # if optional parameter is defined, add it
     if (defined $last) {
-      $url = "https://api-staging.neur.io/v1/samples/live?sensorId=".$self->{'sensor_id'}."&last=$last";
+      $url = $self->{'Recent_Live_url'}."&last=$last";
     } else {
-      $url = "https://api-staging.neur.io/v1/samples/live?sensorId=".$self->{'sensor_id'};
+      $url = $self->{'Recent_Live_url'};
     }
     $response = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
     
     if ($response->is_success) {
       $decoded_response = decode_json($response->content);
     } else {
-      print "Neurio->fetch_Recent_Live(): Response from server is not valid\n";
+      print "\nNeurio->fetch_Recent_Live(): Response from server is not valid\n";
       print "  \"".$response->content."\"\n\n";
       $decoded_response = 0;
     }
@@ -248,18 +269,19 @@ sub fetch_Recent_Live {
  Returns 0 on failure
  
 =cut
+
 sub fetch_Last_Live {
     my $self = shift;
     my ($url,$response,$decoded_response);
     
-    $url      = "https://api-staging.neur.io/v1/samples/live/last?sensorId=".$self->{'sensor_id'};
+    $url      = $self->{'Last_Live_url'};
 	$response = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
-    
+	
     if ($response->is_success) {
       $decoded_response = decode_json($response->content);
     } else {
-      print "Neurio->fetch_Last_Live(): Response from server is not valid\n";
-      print "  \"".$response->content."\"\n\n";
+      print "\nNeurio->fetch_Last_Live(): Response from server is not valid\n";
+      print "  \"".Dumper(($response->content))."\"\n\n";
       $decoded_response = 0;
     }
     
@@ -288,41 +310,44 @@ sub fetch_Last_Live {
      - page        : page number to return - Optional
  
  Returns an array of Perl data structures on success
- $VAR1 = [
-          {
-            'generationEnergy' => 3568948578,
-            'timestamp' => '2014-06-21T19:00:00.000Z',
-            'consumptionEnergy' => 6487889194,
-            'generationPower' => 98,
-            'consumptionPower' => 240
-          },
-          ...
-         ]
+     $VAR1 = [
+              {
+                'generationEnergy' => 3568948578,
+                'timestamp' => '2014-06-21T19:00:00.000Z',
+                'consumptionEnergy' => 6487889194,
+                'generationPower' => 98,
+                'consumptionPower' => 240
+              },
+             ...
+             ]
  Returns 0 on failure
+ 
 =cut
+
 sub fetch_Samples {
     my ($self,$start,$granularity,$end,$frequency,$perPage,$page) = @_;
     my ($url,$response,$decoded_response);
     
-    $url = "https://api-staging.neur.io/v1/samples?sensorId=".$self->{'sensor_id'}."&start=$start&granularity=$granularity";
-    
     # make sure $start and $granularity are defined
     if ((!defined $start) || (!defined $granularity)) {
-      print "Neurio->fetch_Full_Samples(): \$start and \$granularity are required parameters\n\n";
+      print "\nNeurio->fetch_Full_Samples(): \$start and \$granularity are required parameters\n\n";
       return 0;
     }
     # make sure that frequqncy is a multiple of 5 if $granularity is in minutes
     if (($granularity eq 'minutes') and defined $frequency) {
       if (eval($frequency%5) != 0) {
-        print "Neurio->fetch_Samples(): Only multiples of 5 are supported for \$frequency when \$granularity is in minutes\n\n";
+        print "\nNeurio->fetch_Samples(): Only multiples of 5 are supported for \$frequency when \$granularity is in minutes\n\n";
         return 0;
       }
     }
     # make sure $granularity is one of the correct values
     if (!($granularity =~ /[seconds|minutes|hours|days]/)) {
-      print "Neurio->fetch_Full_Samples(): Only values of 'seconds, minutes, hours or days' are supported for \$granularity\n\n";
+      print "\nNeurio->fetch_Full_Samples(): Only values of 'seconds, minutes, hours or days' are supported for \$granularity\n\n";
       return 0;
     }
+    
+    $url = $self->{'Samples_url'}."&start=$start&granularity=$granularity";
+    
     # if optional parameter is defined, add it
     if (defined $end) {
       $url = $url . "&end=$end";
@@ -345,7 +370,7 @@ sub fetch_Samples {
     if ($response->is_success) {
       $decoded_response = decode_json($response->content);
     } else {
-      print "Neurio->fetch_Samples(): Response from server is not valid\n";
+      print "\nNeurio->fetch_Samples(): Response from server is not valid\n";
       print "  \"".$response->content."\"\n\n";
       $decoded_response = 0;
     }
@@ -410,23 +435,26 @@ sub fetch_Samples {
           ...
          ]
  Returns 0 on failure
+ 
 =cut
+
 sub fetch_Full_Samples {
     my ($self,$start,$granularity,$end,$frequency,$perPage,$page) = @_;
     my ($url,$response,$decoded_response);
     
-    $url = "https://api-staging.neur.io/v1/samples/full?sensorId=".$self->{'sensor_id'}."&start=$start&granularity=$granularity";
-
     # make sure $start and $granularity are defined
     if ((!defined $start) || (!defined $granularity)) {
-      print "Neurio->fetch_Full_Samples(): \$start and \$granularity are required parameters\n\n";
+      print "\nNeurio->fetch_Full_Samples(): \$start and \$granularity are required parameters\n\n";
       return 0;
     }
     # make sure $granularity is one of the correct values
     if (!($granularity =~ /[seconds|minutes|hours|days]/)) {
-      print "Neurio->fetch_Full_Samples(): Only values of 'seconds, minutes, hours or days' are supported for \$granularity\n\n";
+      print "\nNeurio->fetch_Full_Samples(): Found \$granularity of $granularity\nOnly values of 'seconds, minutes, hours or days' are supported for \$granularity\n\n";
       return 0;
     }
+    
+    $url = $self->{'Full_Samples_url'}."&start=$start&granularity=$granularity";
+    
     # if optional parameter is defined, add it
     if (defined $end) {
       $url = $url . "&end=$end";
@@ -449,7 +477,7 @@ sub fetch_Full_Samples {
     if ($response->is_success) {
       $decoded_response = decode_json($response->content);
     } else {
-      print "Neurio->fetch_Full_Samples(): Response from server is not valid\n";
+      print "\nNeurio->fetch_Full_Samples(): Response from server is not valid\n";
       print "  \"".$response->content."\"\n\n";
       $decoded_response = 0;
     }
@@ -480,30 +508,33 @@ sub fetch_Full_Samples {
  
  Returns a Perl data structure containing all the raw data
  Returns 0 on failure
+ 
 =cut
+
 sub fetch_Energy_Stats {
     my ($self,$start,$granularity,$end,$frequency,$perPage,$page) = @_;
     my ($url,$response,$decoded_response);
 
-    $url = "https://api-staging.neur.io/v1/samples/stats?sensorId=".$self->{'sensor_id'}."&start=$start&granularity=$granularity";
-
     # make sure $start and $granularity are defined
     if ((!defined $start) || (!defined $granularity)) {
-      print "Neurio->fetch_Energy_Stats(): \$start and \$granularity are required parameters\n\n";
+      print "\nNeurio->fetch_Energy_Stats(): \$start and \$granularity are required parameters\n\n";
       return 0;
     }
     # make sure that frequqncy is a multiple of 5 if $granularity is in minutes
     if (($granularity eq 'minutes') and defined $frequency) {
       if (eval($frequency%5) != 0) {
-        print "Neurio->fetch_Energy_Stats(): Only multiples of 5 are supported for \$frequency when \$granularity is in minutes\n\n";
+        print "\nNeurio->fetch_Energy_Stats(): Only multiples of 5 are supported for \$frequency when \$granularity is in minutes\n\n";
         return 0;
       }
     }
     # make sure $granularity is one of the correct values
     if (!($granularity ~~ ['minutes','hours','days','months'])) {
-      print "Neurio->fetch_Full_Samples(): Only values of 'minutes, hours, days or months' are supported for \$granularity\n\n";
+      print "\nNeurio->fetch_Full_Samples(): Only values of 'minutes, hours, days or months' are supported for \$granularity\n\n";
       return 0;
     }
+    
+    $url = $self->{'Energy_Statps_url'}."&start=$start&granularity=$granularity";
+    
     # if optional parameter is defined, add it
     if (defined $end) {
       $url = $url . "&end=$end";
@@ -521,17 +552,49 @@ sub fetch_Energy_Stats {
       $url = $url . "&page=$page";
     }
     
-	$response         = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
-    
+	$response = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
+        
     if ($response->is_success) {
       $decoded_response = decode_json($response->content);
     } else {
-      print "Neurio->fetch_Energy_Stats(): Response from server is not valid\n";
+      print "\nNeurio->fetch_Energy_Stats(): Response from server is not valid\n";
       print "  \"".$response->content."\"\n\n";
       $decoded_response = 0;
     }
     
     return $decoded_response;
+}
+
+#*****************************************************************
+
+=head2 dump_Object - shows the contents of the local Neurio object
+
+ shows the contents of the local Neurio object in human readable form
+
+   $Neurio->dump_Object();
+
+   This method accepts no parameters
+ 
+ Returns nothing
+ 
+=cut
+
+sub dump_Object {
+    my $self  = shift;
+    
+    print "Key             : ".substr($self->{'key'},              0,120)."\n";
+    print "SecretKey       : ".substr($self->{'secret'},           0,120)."\n";
+    print "Sensor_ID       : ".substr($self->{'sensor_id'},        0,120)."\n";
+    print "Access_token    : ".substr($self->{'access_token'},     0,120)."\n";
+    print "Base 64         : ".substr($self->{'base64'},           0,120)."\n";
+    print "Base URL        : ".substr($self->{'base_url'},         0,120)."\n";
+    print "Recent Live URL : ".substr($self->{'Recent_Live_url'},  0,120)."\n";
+    print "Last Live URL   : ".substr($self->{'Last_Live_url'},    0,120)."\n";
+    print "Samples URL     : ".substr($self->{'Samples_url'},      0,120)."\n";
+    print "Full Samples URL: ".substr($self->{'Full_Samples_url'}, 0,120)."\n";
+    print "Energy Stats URL: ".substr($self->{'Energy_Stats_url'}, 0,120)."\n";
+    print "Debug enabled   : ".substr($self->{'debug'}           , 0,120)."\n";
+    print "\n";
 }
 
 
@@ -547,7 +610,6 @@ Kedar Warriner, C<kedar at cpan.org>
  or through the web interface at http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Device-Neurio
  I will be notified, and then you'll automatically be notified of progress on 
  your bug as I make changes.
-
 
 =head1 SUPPORT
 
@@ -577,7 +639,6 @@ L<http://search.cpan.org/dist/Device-Neurio/>
 
 =back
 
-
 =head1 ACKNOWLEDGEMENTS
 
  Many thanks to:
@@ -594,7 +655,6 @@ L<http://search.cpan.org/dist/Device-Neurio/>
  by the Free Software Foundation; or the Artistic License.
 
  See http://dev.perl.org/licenses/ for more information.
-
 
 =cut
 
