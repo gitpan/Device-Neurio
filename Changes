@@ -31,4 +31,8 @@ Revision history for Device-Neurio
         Added option for debug printouts
         Moved all the URLs to $self
         Added a function to dump the contents of $self
+0.12    July 24, 2014
+        Added decoding of the HTTP code and reason for most recent request
+        Added functions to fetch last code and last reason
+        Moved common code to __process_get
         

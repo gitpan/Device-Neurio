@@ -46,11 +46,11 @@ Device::Neurio - Methods for wrapping the Neurio API calls so that they are
 
 =head1 VERSION
 
-Version 0.11
+Version 0.12
 
 =cut
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 #*****************************************************************
 
@@ -143,6 +143,8 @@ sub new {
     $self->{'Samples_url'}      = $self->{'base_url'}."?sensorId=".$self->{'sensor_id'};
     $self->{'Full_Samples_url'} = $self->{'base_url'}."/full?sensorId=".$self->{'sensor_id'};
     $self->{'Energy_Stats_url'} = $self->{'base_url'}."/stats?sensorId=".$self->{'sensor_id'};
+    $self->{'last_code'}        = '';
+    $self->{'last_reason'}      = '';
     
     bless $self, $class;
     
@@ -186,7 +188,7 @@ sub connect {
       $self->{'access_token'} = $1;
       return 1;
     } else {
-      print "\nNeurio->connect(): Failed to connect.\n";
+      print "\nDevice::Neurio->connect(): Failed to connect.\n";
       print $response->content."\n\n";
       return 0;
     }
@@ -233,17 +235,7 @@ sub fetch_Recent_Live {
     } else {
       $url = $self->{'Recent_Live_url'};
     }
-    $response = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
-    
-    if ($response->is_success) {
-      $decoded_response = decode_json($response->content);
-    } else {
-      print "\nNeurio->fetch_Recent_Live(): Response from server is not valid\n";
-      print "  \"".$response->content."\"\n\n";
-      $decoded_response = 0;
-    }
-    
-    return $decoded_response;
+    return $self->__process_get($url);
 }
 
 
@@ -274,18 +266,9 @@ sub fetch_Last_Live {
     my $self = shift;
     my ($url,$response,$decoded_response);
     
-    $url      = $self->{'Last_Live_url'};
-	$response = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
-	
-    if ($response->is_success) {
-      $decoded_response = decode_json($response->content);
-    } else {
-      print "\nNeurio->fetch_Last_Live(): Response from server is not valid\n";
-      print "  \"".Dumper(($response->content))."\"\n\n";
-      $decoded_response = 0;
-    }
+    $url = $self->{'Last_Live_url'};
     
-    return $decoded_response;
+    return $self->__process_get($url);
 }
 
 
@@ -365,17 +348,7 @@ sub fetch_Samples {
       $url = $url . "&page=$page";
     }
     
-	$response = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
-	
-    if ($response->is_success) {
-      $decoded_response = decode_json($response->content);
-    } else {
-      print "\nNeurio->fetch_Samples(): Response from server is not valid\n";
-      print "  \"".$response->content."\"\n\n";
-      $decoded_response = 0;
-    }
-    
-    return $decoded_response;
+    return $self->__process_get($url);
 }
 
 
@@ -472,17 +445,7 @@ sub fetch_Full_Samples {
       $url = $url . "&page=$page";
     }
     
-	$response  = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
-    
-    if ($response->is_success) {
-      $decoded_response = decode_json($response->content);
-    } else {
-      print "\nNeurio->fetch_Full_Samples(): Response from server is not valid\n";
-      print "  \"".$response->content."\"\n\n";
-      $decoded_response = 0;
-    }
-    
-    return $decoded_response;
+    return $self->__process_get($url);
 }
 
 
@@ -533,7 +496,7 @@ sub fetch_Energy_Stats {
       return 0;
     }
     
-    $url = $self->{'Energy_Statps_url'}."&start=$start&granularity=$granularity";
+    $url = $self->{'Energy_Stats_url'}."&start=$start&granularity=$granularity";
     
     # if optional parameter is defined, add it
     if (defined $end) {
@@ -552,17 +515,7 @@ sub fetch_Energy_Stats {
       $url = $url . "&page=$page";
     }
     
-	$response = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
-        
-    if ($response->is_success) {
-      $decoded_response = decode_json($response->content);
-    } else {
-      print "\nNeurio->fetch_Energy_Stats(): Response from server is not valid\n";
-      print "  \"".$response->content."\"\n\n";
-      $decoded_response = 0;
-    }
-    
-    return $decoded_response;
+    return $self->__process_get($url);
 }
 
 #*****************************************************************
@@ -593,10 +546,69 @@ sub dump_Object {
     print "Samples URL     : ".substr($self->{'Samples_url'},      0,120)."\n";
     print "Full Samples URL: ".substr($self->{'Full_Samples_url'}, 0,120)."\n";
     print "Energy Stats URL: ".substr($self->{'Energy_Stats_url'}, 0,120)."\n";
-    print "Debug enabled   : ".substr($self->{'debug'}           , 0,120)."\n";
+    print "debug           : ".substr($self->{'debug'}           , 0,120)."\n";
+    print "last_code       : ".substr($self->{'last_code'}       , 0,120)."\n";
+    print "last_reason     : ".substr($self->{'last_reason'}     , 0,120)."\n";
+    
     print "\n";
 }
 
+
+#*****************************************************************
+
+=head2 get_last_reason - returns the text generated by the most recent fetch
+
+ Returns the HTTP Header reason for the most recent fetch command
+
+   $Neurio->get_last_reason();
+
+   This method accepts no parameters
+ 
+ Returns the textual reason
+ 
+=cut
+
+sub get_last_reason {
+    my $self  = shift;
+    return $self->{'last_reason'};
+}
+
+#*****************************************************************
+
+=head2 get_last_code - returns the code generated by the most recent fetch
+
+ Returns the HTTP Header code for the most recent fetch command
+
+   $Neurio->get_last_code();
+
+   This method accepts no parameters
+ 
+ Returns the numeric code
+ 
+=cut
+
+sub get_last_code {
+    my $self  = shift;
+    return $self->{'last_code'};
+}
+
+#*****************************************************************
+
+sub __process_get {
+    my $self     = shift;
+    my $url      = shift;
+	my $response = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
+	
+    $self->{'last_reason'} = decode_json($response->content)->{'code'};
+    $self->{'last_code'}   = $response->code;
+    
+    if ($response->is_success) {
+      return decode_json($response->content);
+    } else {
+      print "\n".(caller(1))[3]."(): Failed with return code ".$self->get_last_code()." - ".$self->get_last_reason()."\n";
+      return 0;
+    }
+}
 
 #*****************************************************************
 
@@ -661,4 +673,5 @@ L<http://search.cpan.org/dist/Device-Neurio/>
 #********************************************************************
 1; # End of Device::Neurio - Return success to require/use statement
 #********************************************************************
+
 
