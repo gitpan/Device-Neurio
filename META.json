@@ -4,7 +4,7 @@
       "Kedar Warriner"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "ExtUtils::MakeMaker version 6.8, CPAN::Meta::Converter version 2.120351",
+   "generated_by" : "ExtUtils::MakeMaker version 6.98, CPAN::Meta::Converter version 2.142060",
    "license" : [
       "unknown"
    ],
@@ -39,5 +39,5 @@
       }
    },
    "release_status" : "stable",
-   "version" : "0.12"
+   "version" : "0.13"
 }

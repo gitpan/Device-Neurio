@@ -17,7 +17,8 @@ our @ISA = qw(Exporter);
 # will save memory.
 
 our %EXPORT_TAGS = ( 'all' => [ qw(
-    new connect fetch_Recent_Live fetch_Last_Live fetch_Samples fetch_Full_Samples fetch_Energy_Stats
+    new connect fetch_Samples_Recent_Live fetch_Samples_Last_Live fetch_Samples 
+    fetch_Samples_Full fetch_Stats_Energy
 ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
@@ -46,31 +47,36 @@ Device::Neurio - Methods for wrapping the Neurio API calls so that they are
 
 =head1 VERSION
 
-Version 0.12
+Version 0.13
 
 =cut
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
-#*****************************************************************
-
+#******************************************************************************
 =head1 SYNOPSIS
 
  This module provides a Perl interface to a Neurio sensor via the following 
  methods:
    - new
    - connect
-   - fetch_Last_Live
-   - fetch_Recent_Live
    - fetch_Samples
-   - fetch_Full_samples
-   - fetch_Energy_Stats
+   - fetch_Samples_Full
+   - fetch_Samples_Last_Live
+   - fetch_Samples_Recent_Live
+   - fetch_Stats_Energy
+   - fetch_Appliances
+   - fetch_Appliances_Events
+   - fetch_Appliances_Specific
+   - fetch_Appliances_Stats
 
- Please note that in order to use this module you will require three parameters
- (key, secret, sensor_id) as well as an Energy Aware Neurio sensor installed in
- your house.
+ Please note that in order to use the 'Samples' methods in this module you will 
+ require three parameters (key, secret, sensor_id) as well as an Energy Aware 
+ Neurio sensor installed in your house.  In order to use the 'Appliances'
+ methods, you will also require another parameter (location_id).  This information
+ can be obtained from the Neurio developpers website.
 
- The module is written entirely in Perl and has been developped on Raspbian Linux.
+ The module is written entirely in Perl and was developped on Raspbian Linux.
 
  All date/time values are specified using ISO8601 format (yyyy-mm-ddThh:mm:ssZ)
 
@@ -82,10 +88,10 @@ our $VERSION = '0.12';
 
     $my_Neurio->connect();
   
-    $data = $my_Neurio->fetch_Last_Live();
+    $data = $my_Neurio->fetch_Samples_Last_Live();
     print $data->{'consumptionPower'}
 
-    $data = $my_Neurio->fetch_Recent_Live("2014-06-18T19:20:21Z");
+    $data = $my_Neurio->fetch_Samples_Recent_Live("2014-06-18T19:20:21Z");
     print $data->[0]->{'consumptionPower'}
 
     undef $my_Neurio;
@@ -101,7 +107,8 @@ our $VERSION = '0.12';
 =head2 new - the constructor for a Neurio object
 
  Creates a new instance which will be able to fetch data from a unique Neurio 
- sensor.
+ sensor.  All three parameters are required and can be obtained from the
+ Neurio developpers website.
 
  my $Neurio = Device::Neurio->new($key, $secret, $sensor_id, $debug);
 
@@ -109,7 +116,7 @@ our $VERSION = '0.12';
      - $key       : unique key for the account - Required 
      - $secret    : secret key for the account - Required 
      - $sensor_id : sensor ID connected to the account - Required 
-     - $debug     : enable or disable debug messages (disabled by default - Optional)
+     - $debug     : turn on debug messages - Optional
 
  Returns a Neurio object if successful.
  Returns 0 on failure
@@ -133,18 +140,25 @@ sub new {
     }
     
     if ((!defined $self->{'key'}) || (!defined $self->{'secret'}) || (!defined $self->{'sensor_id'})) {
-      print "\nNeurio->new(): Key, Secret and Sensor_ID are REQUIRED parameters.\n";
+      print "\nNeurio->new(): Key, Secret and Sensor_ID are REQUIRED parameters\n" if ($self->{'debug'});
+      $self->{'last_code'}      = '0';
+      $self->{'last_reason'}    = 'Neurio->new(): Key, Secret and Sensor_ID are REQUIRED parameters';
       return 0;
     }
     
-    $self->{'base_url'}         = "https://api-staging.neur.io/v1/samples";
-    $self->{'Recent_Live_url'}  = $self->{'base_url'}."/live?sensorId=".$self->{'sensor_id'};
-    $self->{'Last_Live_url'}    = $self->{'base_url'}."/live/last?sensorId=".$self->{'sensor_id'};
-    $self->{'Samples_url'}      = $self->{'base_url'}."?sensorId=".$self->{'sensor_id'};
-    $self->{'Full_Samples_url'} = $self->{'base_url'}."/full?sensorId=".$self->{'sensor_id'};
-    $self->{'Energy_Stats_url'} = $self->{'base_url'}."/stats?sensorId=".$self->{'sensor_id'};
-    $self->{'last_code'}        = '';
-    $self->{'last_reason'}      = '';
+#    $self->{'base_url'}                = "https://api-staging.neur.io/v1";
+    $self->{'base_url'}                = "https://api.neur.io/v1";
+    $self->{'Samples_Recent_Live_url'} = $self->{'base_url'}."/samples/live?sensorId=".$self->{'sensor_id'};
+    $self->{'Samples_Last_Live_url'}   = $self->{'base_url'}."/samples/live/last?sensorId=".$self->{'sensor_id'};
+    $self->{'Samples_url'}             = $self->{'base_url'}."/samples?sensorId=".$self->{'sensor_id'};
+    $self->{'Samples_Full_url'}        = $self->{'base_url'}."/samples/full?sensorId=".$self->{'sensor_id'};
+    $self->{'Stats_Energy_url'}        = $self->{'base_url'}."/samples/stats?sensorId=".$self->{'sensor_id'};
+    $self->{'Appliances_url'}          = $self->{'base_url'}."/appliances";
+    $self->{'Appliances_Specific_url'} = $self->{'base_url'}."/appliances/";
+    $self->{'Appliances_Stats_url'}    = $self->{'base_url'}."/appliances/stats";
+    $self->{'Appliances_Events_url'}   = $self->{'base_url'}."/appliances/events";
+    $self->{'last_code'}               = '';
+    $self->{'last_reason'}             = '';
     
     bless $self, $class;
     
@@ -152,16 +166,24 @@ sub new {
 }
 
 
-#*****************************************************************
-
+#******************************************************************************
 =head2 connect - open a secure connection to the Neurio server
 
  Opens a secure connection via HTTPS to the Neurio server which provides
  access to a set of API commands to access the sensor data.
-
-   $Neurio->connect();
  
- This method accepts no parameters
+ An optional location ID can be given.  This is only required if calls
+ will be made to the 'Appliance' methods.  Calls to the 'Samples'
+ methods do not require that a location ID be set.  If a location_id is not
+ specified at connection, then it must be specified when using the 'Appliance'
+ methods.
+ 
+ A location ID can be acquired from the Neurio developpers web site
+
+   $Neurio->connect($location_id);
+ 
+   This method accepts the following parameter:
+     - $location_id : unique location id - Optional 
  
  Returns 1 on success 
  Returns 0 on failure
@@ -169,9 +191,15 @@ sub new {
 =cut
 
 sub connect {
-	my $self         = shift;
-	my $access_token = '';
+    my ($self,$location_id) = @_;
+	my $access_token        = '';
 	
+    if (defined $location_id) {
+      $self->{'location_id'} = $location_id;
+    } else {
+      $self->{'location_id'} = '';
+    }
+
     # Submit request for authentiaction token.
     my $response = $self->{'ua'}->post('https://api-staging.neur.io/v1/oauth2/token',
           { basic_authentication => $self->{'base64'},
@@ -188,25 +216,26 @@ sub connect {
       $self->{'access_token'} = $1;
       return 1;
     } else {
-      print "\nDevice::Neurio->connect(): Failed to connect.\n";
-      print $response->content."\n\n";
+      print "\nDevice::Neurio->connect(): Failed to connect.\n" if ($self->{'debug'});
+      print $response->content."\n\n" if ($self->{'debug'});
+      $self->{'last_code'}   = '0';
+      $self->{'last_reason'} = 'Neurio->new(): Device::Neurio->connect(): Failed to connect';
       return 0;
     }
 }
 
 
-#*****************************************************************
-
-=head2 fetch_Recent_Live - Fetch recent sensor samples
+#******************************************************************************
+=head2 fetch_Samples_Recent_Live - Fetch recent sensor samples
 
  Retrieves recent sensor readings from the Neurio server.
  The values represent the sum of all phases.
 
-   $Neurio->fetch_Recent_Live($last);
+   $Neurio->fetch_Samples_Recent_Live($last);
  
    This method accepts the following parameters:
-      $last - time of last sample received (yyyy-mm-ddThh:mm:ssZ) - Optional
-              specified using ISO8601 format
+      $last - time of last sample received specified using ISO8601 
+              format (yyyy-mm-ddThh:mm:ssZ)  - Optional
       
       If no value is specified for $last, a default of 2 minutes is used.
  
@@ -225,28 +254,27 @@ sub connect {
  
 =cut
 
-sub fetch_Recent_Live {
+sub fetch_Samples_Recent_Live {
     my ($self,$last) = @_;
-    my ($url,$response,$decoded_response);
+    my $url;
 
     # if optional parameter is defined, add it
     if (defined $last) {
-      $url = $self->{'Recent_Live_url'}."&last=$last";
+      $url = $self->{'Samples_Recent_Live_url'}."&last=$last";
     } else {
-      $url = $self->{'Recent_Live_url'};
+      $url = $self->{'Samples_Recent_Live_url'};
     }
     return $self->__process_get($url);
 }
 
 
-#*****************************************************************
+#******************************************************************************
+=head2 fetch_Samples_Last_Live - Fetch the last live sensor sample
 
-=head2 fetch_Last_Live - Fetch the last live sensor sample
-
- Retrieves the last live sensor reading from the Neurio server.  
+ Retrieves the last live sensor reading from the Neurio server.
  The values represent the sum of all phases.
 
-   $Neurio->fetch_Last_Live();
+   $Neurio->fetch_Samples_Last_Live();
 
    This method accepts no parameters
  
@@ -262,18 +290,14 @@ sub fetch_Recent_Live {
  
 =cut
 
-sub fetch_Last_Live {
+sub fetch_Samples_Last_Live {
     my $self = shift;
-    my ($url,$response,$decoded_response);
-    
-    $url = $self->{'Last_Live_url'};
-    
+    my $url = $self->{'Samples_Last_Live_url'};
     return $self->__process_get($url);
 }
 
 
-#*****************************************************************
-
+#******************************************************************************
 =head2 fetch_Samples - Fetch sensor samples from the Neurio server
 
  Retrieves sensor readings within the parameters specified.
@@ -309,27 +333,32 @@ sub fetch_Last_Live {
 
 sub fetch_Samples {
     my ($self,$start,$granularity,$end,$frequency,$perPage,$page) = @_;
-    my ($url,$response,$decoded_response);
     
     # make sure $start and $granularity are defined
     if ((!defined $start) || (!defined $granularity)) {
-      print "\nNeurio->fetch_Full_Samples(): \$start and \$granularity are required parameters\n\n";
+      print "\nNeurio->fetch_Samples_Full(): \$start and \$granularity are required parameters\n\n" if ($self->{'debug'});
+      $self->{'last_code'}   = '0';
+      $self->{'last_reason'} = 'Neurio->fetch_Samples_Full(): \$start and \$granularity are required parameters';
       return 0;
     }
     # make sure that frequqncy is a multiple of 5 if $granularity is in minutes
     if (($granularity eq 'minutes') and defined $frequency) {
       if (eval($frequency%5) != 0) {
-        print "\nNeurio->fetch_Samples(): Only multiples of 5 are supported for \$frequency when \$granularity is in minutes\n\n";
+        print "\nNeurio->fetch_Samples(): Only multiples of 5 are supported for \$frequency when \$granularity is in minutes\n\n" if ($self->{'debug'});
+      $self->{'last_code'}   = '0';
+      $self->{'last_reason'} = 'Neurio->fetch_Samples(): Only multiples of 5 are supported for \$frequency when \$granularity is in minutes';
         return 0;
       }
     }
     # make sure $granularity is one of the correct values
     if (!($granularity =~ /[seconds|minutes|hours|days]/)) {
-      print "\nNeurio->fetch_Full_Samples(): Only values of 'seconds, minutes, hours or days' are supported for \$granularity\n\n";
+      print "\nNeurio->fetch_Samples_Full(): Only values of 'seconds, minutes, hours or days' are supported for \$granularity\n\n" if ($self->{'debug'});
+      $self->{'last_code'}   = '0';
+      $self->{'last_reason'} = 'Neurio->fetch_Samples_Full(): Only values of "seconds, minutes, hours or days" are supported for \$granularity';
       return 0;
     }
     
-    $url = $self->{'Samples_url'}."&start=$start&granularity=$granularity";
+    my $url = $self->{'Samples_url'}."&start=$start&granularity=$granularity";
     
     # if optional parameter is defined, add it
     if (defined $end) {
@@ -352,14 +381,13 @@ sub fetch_Samples {
 }
 
 
-#*****************************************************************
-
-=head2 fetch_Full_Samples - Fetches full samples for all phases
+#******************************************************************************
+=head2 fetch_Samples_Full - Fetches full samples for all phases
 
  Retrieves full sensor readings including data for each individual phase within 
  the parameters specified.
 
- $Neurio->fetch_Full_Samples($start,$granularity,$end,$frequency,$perPage,$page);
+ $Neurio->fetch_Samples_Full($start,$granularity,$end,$frequency,$perPage,$page);
 
    This method accepts the following parameters:
      - start       : yyyy-mm-ddThh:mm:ssZ - Required
@@ -411,22 +439,25 @@ sub fetch_Samples {
  
 =cut
 
-sub fetch_Full_Samples {
+sub fetch_Samples_Full {
     my ($self,$start,$granularity,$end,$frequency,$perPage,$page) = @_;
-    my ($url,$response,$decoded_response);
     
     # make sure $start and $granularity are defined
     if ((!defined $start) || (!defined $granularity)) {
-      print "\nNeurio->fetch_Full_Samples(): \$start and \$granularity are required parameters\n\n";
+      print "\nNeurio->fetch_Samples_Full(): \$start and \$granularity are required parameters\n\n" if ($self->{'debug'});
+      $self->{'last_code'}   = '0';
+      $self->{'last_reason'} = 'Neurio->fetch_Samples_Full(): \$start and \$granularity are required parameters';
       return 0;
     }
     # make sure $granularity is one of the correct values
     if (!($granularity =~ /[seconds|minutes|hours|days]/)) {
-      print "\nNeurio->fetch_Full_Samples(): Found \$granularity of $granularity\nOnly values of 'seconds, minutes, hours or days' are supported for \$granularity\n\n";
+      print "\nNeurio->fetch_Samples_Full(): Found \$granularity of $granularity\nOnly values of 'seconds, minutes, hours or days' are supported for \$granularity\n\n" if ($self->{'debug'});
+      $self->{'last_code'}   = '0';
+      $self->{'last_reason'} = 'Neurio->fetch_Samples_Full(): Only values of "seconds, minutes, hours or days" are supported for \$granularity';
       return 0;
     }
     
-    $url = $self->{'Full_Samples_url'}."&start=$start&granularity=$granularity";
+    my $url = $self->{'Samples_Full_url'}."&start=$start&granularity=$granularity";
     
     # if optional parameter is defined, add it
     if (defined $end) {
@@ -449,14 +480,13 @@ sub fetch_Full_Samples {
 }
 
 
-#*****************************************************************
-
-=head2 fetch_Energy_Stats - Fetches energy statistics
+#******************************************************************************
+=head2 fetch_Stats_Energy - Fetches energy statistics
 
  Retrieves energy statistics within the parameters specified.
  The values represent the sum of all phases.
 
-   $Neurio->fetch_Energy_Stats($start,$granularity,$end,$frequency,$perPage,$page);
+   $Neurio->fetch_Stats_Energy($start,$granularity,$end,$frequency,$perPage,$page);
 
    This method accepts the following parameters:
      - start       : yyyy-mm-ddThh:mm:ssZ - Required
@@ -474,29 +504,34 @@ sub fetch_Full_Samples {
  
 =cut
 
-sub fetch_Energy_Stats {
+sub fetch_Stats_Energy {
     my ($self,$start,$granularity,$end,$frequency,$perPage,$page) = @_;
-    my ($url,$response,$decoded_response);
 
     # make sure $start and $granularity are defined
     if ((!defined $start) || (!defined $granularity)) {
-      print "\nNeurio->fetch_Energy_Stats(): \$start and \$granularity are required parameters\n\n";
+      print "\nNeurio->fetch_Stats_Energy(): \$start and \$granularity are required parameters\n\n" if ($self->{'debug'});
+      $self->{'last_code'}   = '0';
+      $self->{'last_reason'} = 'Neurio->fetch_Stats_Energy(): \$start and \$granularity are required parameters';
       return 0;
     }
     # make sure that frequqncy is a multiple of 5 if $granularity is in minutes
     if (($granularity eq 'minutes') and defined $frequency) {
       if (eval($frequency%5) != 0) {
-        print "\nNeurio->fetch_Energy_Stats(): Only multiples of 5 are supported for \$frequency when \$granularity is in minutes\n\n";
+        print "\nNeurio->fetch_Stats_Energy(): Only multiples of 5 are supported for \$frequency when \$granularity is in minutes\n\n" if ($self->{'debug'});
+      $self->{'last_code'}   = '0';
+      $self->{'last_reason'} = 'Neurio->fetch_Stats_Energy(): Only multiples of 5 are supported for \$frequency when \$granularity is in minutes';
         return 0;
       }
     }
     # make sure $granularity is one of the correct values
     if (!($granularity ~~ ['minutes','hours','days','months'])) {
-      print "\nNeurio->fetch_Full_Samples(): Only values of 'minutes, hours, days or months' are supported for \$granularity\n\n";
+      print "\nNeurio->fetch_Stats_Energy(): Only values of 'minutes, hours, days or months' are supported for \$granularity\n\n" if ($self->{'debug'});
+      $self->{'last_code'}   = '0';
+      $self->{'last_reason'} = 'Neurio->fetch_Stats_Energy(): Only values of "minutes, hours, days or months" are supported for \$granularity';
       return 0;
     }
     
-    $url = $self->{'Energy_Stats_url'}."&start=$start&granularity=$granularity";
+    my $url = $self->{'Stats_Energy_url'}."&start=$start&granularity=$granularity";
     
     # if optional parameter is defined, add it
     if (defined $end) {
@@ -518,8 +553,309 @@ sub fetch_Energy_Stats {
     return $self->__process_get($url);
 }
 
-#*****************************************************************
 
+#******************************************************************************
+=head2 fetch_Appliances - Fetch the appliances for a specific location
+
+ Retrieves the appliances added for a specific location.  
+ 
+ The location_id is an optional parameter because it can be specified when 
+ connecting.  If it is specified below, then this will over-ride the location 
+ ID set when connecting, but for this function call only.
+
+   $Neurio->fetch_Appliances($location_id);
+
+   This method accepts the following parameters:
+     - $location_id  : id of a location - Optional
+ 
+ Returns an array of Perl data structures on success
+ $VAR1 = [
+          {
+            'locationId' => 'xxxxxxxxxxxxxxx',
+            'name' => 'lighting_appliance',
+            'id' => 'yyyyyyyyyyyyyyyyy',
+            'label' => 'Range Light on Medium',
+            'tags' => []
+          },
+          {
+            'locationId' => 'xxxxxxxxxxxxxxx-3',
+            'name' => 'refrigerator',
+            'id' => 'zzzzzzzzzzzzzzzz',
+            'label' => '',
+            'tags' => []
+          },
+          ....
+         ]
+ Returns 0 on failure
+ 
+=cut
+
+sub fetch_Appliances {
+    my ($self,$location_id) = @_;
+    
+    # check if $location_id is defined
+    if (!defined $location_id) {
+      if (!defined $self->{'location_id'}) {
+        print "\nNeurio->fetch_Appliances(): \$location_id is a required parameter\n\n" if ($self->{'debug'});
+        $self->{'last_code'}   = '0';
+        $self->{'last_reason'} = 'Neurio->fetch_Appliances(): \$location_id is a required parameters';
+        return 0;
+      } else {
+        $location_id = $self->{'location_id'};
+      }
+    }
+    my $url = $self->{'Appliances_url'}."?locationId=$location_id";
+
+    return $self->__process_get($url);
+}
+
+
+#******************************************************************************
+=head2 fetch_Appliances_Specific - Fetch information about a specific appliance
+
+ Retrieves information about a specific appliance.  
+ 
+ The applicance_id parameter is determined by using the fetch_Appliance method 
+ which returns a list of appliances with their IDs
+
+   $Neurio->fetch_Appliances_Specific($appliance_id);
+
+   This method accepts the following parameters:
+     - $appliance_id  : id of the appliance - Required
+ 
+ Returns a Perl data structure on success:
+ $VAR1 = {
+          'locationId' => 'xxxxxxxxxxxxx,
+          'name' => 'lighting_appliance',
+          'id' => 'yyyyyyyyyyyyyyy',
+          'label' => 'Range Light on Medium',
+          'tags' => []
+        };
+ Returns 0 on failure
+ 
+=cut
+
+sub fetch_Appliances_Specific {
+    my ($self,$appliance_id) = @_;
+    
+    # make sure $id is defined
+    if (!defined $appliance_id) {
+      print "\nNeurio->fetch_Appliances_Specific(): \$appliance_id is a required parameter\n\n" if ($self->{'debug'});
+      $self->{'last_code'}   = '0';
+      $self->{'last_reason'} = 'Neurio->fetch_Appliances_Specific(): \$appliance_id is a required parameters';
+      return 0;
+    }
+
+    my $url = $self->{'Appliances_Specific_url'}.$appliance_id;
+    
+    return $self->__process_get($url);
+}
+
+
+#******************************************************************************
+=head2 fetch_Appliances_Stats - Fetch usage data for a given appliance
+
+ Retrieves usage data for a specific appliance at a specific location.  
+ 
+ The applicance_id parameter is determined by using the fetch_Appliance method 
+ which returns a list of appliances with their IDs
+
+   $Neurio->fetch_Appliances_Stats($location_id,$appliance_id,$start,$granularity,$end,$frequency,$perPage,$page);
+
+   This method accepts the following parameters:
+      - $location_Id  : id of a location - Required
+      - $appliance_id : id of the appliance - Required
+      - start         : yyyy-mm-ddThh:mm:ssZ - Required
+                        specified using ISO8601 format
+      - granularity   : seconds|minutes|hours|days - Required
+      - end           : yyyy-mm-ddThh:mm:ssZ - Required
+                        specified using ISO8601 format
+      - frequency     : an integer - Required
+      - perPage       : number of results per page - Optional
+      - page          : page number to return - Optional
+ 
+ Returns an array of Perl data structures on success
+$VAR1 = [
+          {
+            'energy' => 152927,
+            'averagePower' => '110',
+            'timeOn' => 1398,
+            'guesses' => {},
+            'end' => '2014-09-05T14:00:00.000Z',
+            'lastEvent' => {
+                             'energy' => 74124,
+                             'averagePower' => '109',
+                             'guesses' => {},
+                             'end' => '2014-09-05T13:50:44.055Z',
+                             'groupIds' => [
+                                             'aaaaaaaaaaaaaaaaa'
+                                           ],
+                             'id' => '5EGh7o8eQJuIvsdA4qMkEw',
+                             'appliance' => {
+                                              'locationId' => 'ccccccccccccccccc-3',
+                                              'name' => 'refrigerator',
+                                              'id' => 'bbbbbbbbbbbbbbbbb',
+                                              'label' => '',
+                                              'tags' => []
+                                            },
+                             'start' => '2014-09-05T13:39:20.115Z'
+                           },
+            'groupIds' => [
+                            'aaaaaaaaaaaaaaaaa'
+                          ],
+            'eventCount' => 2,
+            'usagePercentage' => '2.465231',
+            'id' => 'ddddddddddddddd',
+            'appliance' => {
+                             'locationId' => 'ccccccccccccccccc-3',
+                             'name' => 'refrigerator',
+                             'id' => 'bbbbbbbbbbbbbbbbb',
+                             'label' => '',
+                             'tags' => []
+                           },
+            'start' => '2014-09-05T13:00:00.000Z'
+          },
+          ......
+        ]
+ Returns 0 on failure
+ 
+=cut
+
+sub fetch_Appliances_Stats {
+    my ($self,$location_id,$appliance_id,$start,$granularity,$end,$frequency,$perPage,$page) = @_;
+    
+    # make sure $location_id is defined
+    if (!defined $location_id) {
+      print "\nNeurio->fetch_Appliances_Stats(): \$location_id is a required parameter\n\n" if ($self->{'debug'});
+      $self->{'last_code'}   = '0';
+      $self->{'last_reason'} = 'Neurio->fetch_Appliances_Stats(): \$location_id is a required parameters';
+      return 0;
+    }
+    # make sure $appliance_id is defined
+    if (!defined $appliance_id) {
+      print "\nNeurio->fetch_Appliances_Stats(): \$appliance_id is a required parameter\n\n" if ($self->{'debug'});
+      $self->{'last_code'}   = '0';
+      $self->{'last_reason'} = 'Neurio->fetch_Appliances_Stats(): \$appliance_id is a required parameters';
+      return 0;
+    }
+    # make sure $start, $granularity, $end and $frequqncy are defined
+    if ((!defined $start) || (!defined $granularity) || (!defined $end) || (!defined $frequency)) {
+      print "\nNeurio->fetch_Appliances_Stats(): \$start, \$granularity, \$end and \$frequency are required parameters\n\n" if ($self->{'debug'});
+      $self->{'last_code'}   = '0';
+      $self->{'last_reason'} = 'Neurio->fetch_Appliances_Stats(): \$start, \$granularity, \$end and \$frequency are required parameters';
+      return 0;
+    }
+    # make sure $granularity is one of the correct values
+    if (!($granularity =~ /[seconds|minutes|hours|days]/)) {
+      print "\nNeurio->fetch_Appliances_Stats(): Found \$granularity of $granularity\nOnly values of 'seconds, minutes, hours or days' are supported for \$granularity\n\n" if ($self->{'debug'});
+      $self->{'last_code'}   = '0';
+      $self->{'last_reason'} = 'Neurio->fetch_Appliances_Stats(): Only values of "seconds, minutes, hours or days" are supported for \$granularity';
+      return 0;
+    }
+    
+    my $url = $self->{'Appliances_Stats_url'}."?locationId=$location_id&appliance_id=$appliance_id&start=$start&granularity=$granularity&end=$end&frequency=$frequency";
+    
+    # if optional parameter is defined, add it
+    if (defined $perPage) {
+      $url = $url . "&perPage=$perPage";
+    }
+    # if optional parameter is defined, add it
+    if (defined $page) {
+      $url = $url . "&page=$page";
+    }
+    
+    return $self->__process_get($url);
+}
+
+
+#******************************************************************************
+=head2 fetch_Appliances_Events - Fetch events for a specific appliance
+
+ Retrieves events for a specific appliance.  An event is an interval when an 
+ appliance was in use.
+ 
+ The applicance_id parameter is determined by using the fetch_Appliance method 
+ which returns a list of appliances with their IDs
+
+   $Neurio->fetch_Appliances_Events($location_id,$appliance_id,$start,$end,$perPage,$page);
+
+   This method accepts the following parameters:
+      - $location_Id  : id of a location - Required
+      - $appliance_id : id of the appliance - Required
+      - start         : yyyy-mm-ddThh:mm:ssZ - Required
+                        specified using ISO8601 format
+      - end           : yyyy-mm-ddThh:mm:ssZ - Required
+                        specified using ISO8601 format
+      - perPage       : number of results per page - Optional
+      - page          : page number to return - Optional
+ 
+ Returns an array of Perl data structures on success
+$VAR1 = [
+          {
+            'energy' => 74124,
+            'averagePower' => '109',
+            'guesses' => {},
+            'end' => '2014-09-05T13:50:44.055Z',
+            'groupIds' => [
+                            'aaaaaaaaaaaaaaaaa'
+                          ],
+            'id' => 'fGol_nJ9Q06-8SsIJyHLlw',
+            'appliance' => {
+                             'locationId' => 'bbbbbbbbbbbbbbbbb-3',
+                             'name' => 'refrigerator',
+                             'id' => 'cccccccccccccccccc',
+                             'label' => '',
+                             'tags' => []
+                           },
+            'start' => '2014-09-05T13:39:20.115Z'
+          },
+          ......
+        ]
+ Returns 0 on failure
+ 
+=cut
+
+sub fetch_Appliances_Events {
+    my ($self,$location_id,$appliance_id,$start,$end,$perPage,$page) = @_;
+    
+    # make sure $location_id is defined
+    if (!defined $location_id) {
+      print "\nNeurio->fetch_Appliances_Events(): \$location_id is a required parameter\n\n" if ($self->{'debug'});
+      $self->{'last_code'}   = '0';
+      $self->{'last_reason'} = 'Neurio->fetch_Appliances_Events(): \$location_id is a required parameters';
+      return 0;
+    }
+    # make sure $appliance_id is defined
+    if (!defined $appliance_id) {
+      print "\nNeurio->fetch_Appliances_Events(): \$appliance_id is a required parameter\n\n" if ($self->{'debug'});
+      $self->{'last_code'}   = '0';
+      $self->{'last_reason'} = 'Neurio->fetch_Appliances_Events(): \$appliance_id is a required parameters';
+      return 0;
+    }
+    # make sure $start and $end are defined
+    if ((!defined $start) || (!defined $end)) {
+      print "\nNeurio->fetch_Appliances_Events(): \$start and \$end are required parameters\n\n" if ($self->{'debug'});
+      $self->{'last_code'}   = '0';
+      $self->{'last_reason'} = 'Neurio->fetch_Appliances_Events(): \$start and \$end are required parameters';
+      return 0;
+    }
+
+    my $url = $self->{'Appliances_Events_url'}."?locationId=$location_id&appliance_id=$appliance_id&start=$start&end=$end";
+    
+    # if optional parameter is defined, add it
+    if (defined $perPage) {
+      $url = $url . "&perPage=$perPage";
+    }
+    # if optional parameter is defined, add it
+    if (defined $page) {
+      $url = $url . "&page=$page";
+    }
+    
+    return $self->__process_get($url);
+}
+
+
+#******************************************************************************
 =head2 dump_Object - shows the contents of the local Neurio object
 
  shows the contents of the local Neurio object in human readable form
@@ -535,27 +871,30 @@ sub fetch_Energy_Stats {
 sub dump_Object {
     my $self  = shift;
     
-    print "Key             : ".substr($self->{'key'},              0,120)."\n";
-    print "SecretKey       : ".substr($self->{'secret'},           0,120)."\n";
-    print "Sensor_ID       : ".substr($self->{'sensor_id'},        0,120)."\n";
-    print "Access_token    : ".substr($self->{'access_token'},     0,120)."\n";
-    print "Base 64         : ".substr($self->{'base64'},           0,120)."\n";
-    print "Base URL        : ".substr($self->{'base_url'},         0,120)."\n";
-    print "Recent Live URL : ".substr($self->{'Recent_Live_url'},  0,120)."\n";
-    print "Last Live URL   : ".substr($self->{'Last_Live_url'},    0,120)."\n";
-    print "Samples URL     : ".substr($self->{'Samples_url'},      0,120)."\n";
-    print "Full Samples URL: ".substr($self->{'Full_Samples_url'}, 0,120)."\n";
-    print "Energy Stats URL: ".substr($self->{'Energy_Stats_url'}, 0,120)."\n";
-    print "debug           : ".substr($self->{'debug'}           , 0,120)."\n";
-    print "last_code       : ".substr($self->{'last_code'}       , 0,120)."\n";
-    print "last_reason     : ".substr($self->{'last_reason'}     , 0,120)."\n";
-    
+    print "Key                     : ".substr($self->{'key'},                      0,120)."\n";
+    print "SecretKey               : ".substr($self->{'secret'},                   0,120)."\n";
+    print "Sensor_ID               : ".substr($self->{'sensor_id'},                0,120)."\n";
+    print "Location_ID             : ".substr($self->{'location_id'},              0,120)."\n";
+    print "Access_token            : ".substr($self->{'access_token'},             0,120)."\n";
+    print "Base 64                 : ".substr($self->{'base64'},                   0,120)."\n";
+    print "Base URL                : ".substr($self->{'base_url'},                 0,120)."\n";
+    print "Samples_Recent_Live URL : ".substr($self->{'Samples_Recent_Live_url'},  0,120)."\n";
+    print "Samples_Last_Live URL   : ".substr($self->{'Samples_Last_Live_url'},    0,120)."\n";
+    print "Samples URL             : ".substr($self->{'Samples_url'},              0,120)."\n";
+    print "Samples_Full URL        : ".substr($self->{'Samples_Full_url'},         0,120)."\n";
+    print "Stats_Energy URL        : ".substr($self->{'Stats_Energy_url'},         0,120)."\n";
+    print "Appliances URL          : ".substr($self->{'Appliances_url'},           0,120)."\n";
+    print "Appliances_Specific URL : ".substr($self->{'Appliances_Specific_url'},  0,120)."\n";
+    print "Appliances_Stats URL    : ".substr($self->{'Appliances_Stats_url'},     0,120)."\n";
+    print "Appliances_Events URL   : ".substr($self->{'Appliances_Events_url'},    0,120)."\n";
+    print "debug                   : ".substr($self->{'debug'},                    0,120)."\n";
+    print "last_code               : ".substr($self->{'last_code'},                0,120)."\n";
+    print "last_reason             : ".substr($self->{'last_reason'},              0,120)."\n";
     print "\n";
 }
 
 
-#*****************************************************************
-
+#******************************************************************************
 =head2 get_last_reason - returns the text generated by the most recent fetch
 
  Returns the HTTP Header reason for the most recent fetch command
@@ -573,8 +912,7 @@ sub get_last_reason {
     return $self->{'last_reason'};
 }
 
-#*****************************************************************
-
+#******************************************************************************
 =head2 get_last_code - returns the code generated by the most recent fetch
 
  Returns the HTTP Header code for the most recent fetch command
@@ -592,26 +930,29 @@ sub get_last_code {
     return $self->{'last_code'};
 }
 
-#*****************************************************************
-
+#******************************************************************************
 sub __process_get {
     my $self     = shift;
     my $url      = shift;
 	my $response = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
-	
-    $self->{'last_reason'} = decode_json($response->content)->{'code'};
-    $self->{'last_code'}   = $response->code;
-    
+
+    $self->{'last_code'} = $response->code;
+
+    if (($response->code) eq '200') {
+      $self->{'last_reason'} = '';
+    } else {
+      $self->{'last_reason'} = $response->message;
+    }
+
     if ($response->is_success) {
       return decode_json($response->content);
     } else {
-      print "\n".(caller(1))[3]."(): Failed with return code ".$self->get_last_code()." - ".$self->get_last_reason()."\n";
+      print "\n".(caller(1))[3]."(): Failed with return code ".$self->get_last_code()." - ".$self->get_last_reason()."\n" if ($self->{'debug'});
       return 0;
     }
 }
 
-#*****************************************************************
-
+#******************************************************************************
 =head1 AUTHOR
 
 Kedar Warriner, C<kedar at cpan.org>
@@ -670,8 +1011,8 @@ L<http://search.cpan.org/dist/Device-Neurio/>
 
 =cut
 
-#********************************************************************
+#******************************************************************************
 1; # End of Device::Neurio - Return success to require/use statement
-#********************************************************************
+#******************************************************************************
 
 

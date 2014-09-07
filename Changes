@@ -35,4 +35,11 @@ Revision history for Device-Neurio
         Added decoding of the HTTP code and reason for most recent request
         Added functions to fetch last code and last reason
         Moved common code to __process_get
+0.13    Sept 07, 2014
+        Corrected a bug in __process_get()
+        implemented the storing of "code" and "reason" from the most recent API call
+        Added support for new 'Appliance' API features
+        Changed the names of existing 'Samples' functions to follow a more consistent naming scheme
+        Updated documentation
+        
         
