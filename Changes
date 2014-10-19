@@ -41,5 +41,9 @@ Revision history for Device-Neurio
         Added support for new 'Appliance' API features
         Changed the names of existing 'Samples' functions to follow a more consistent naming scheme
         Updated documentation
+0.14    Oct 19, 2014
+        Added separate functions for fetching events per appliance or per location
+        Added support for 'since' option when getting appliance events by location
+        
         
         

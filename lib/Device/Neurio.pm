@@ -28,11 +28,13 @@ BEGIN
 {
   if ($^O eq "MSWin32"){
     use LWP::UserAgent;
+    use Time::Local;
     use JSON qw(decode_json encode_json);
     use MIME::Base64 (qw(encode_base64));
     use Data::Dumper;
   } else {
     use LWP::UserAgent;
+    use Time::Local;
     use JSON qw(decode_json encode_json);
     use MIME::Base64 (qw(encode_base64));
     use Data::Dumper;
@@ -47,11 +49,11 @@ Device::Neurio - Methods for wrapping the Neurio API calls so that they are
 
 =head1 VERSION
 
-Version 0.13
+Version 0.14
 
 =cut
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 
 #******************************************************************************
 =head1 SYNOPSIS
@@ -306,15 +308,15 @@ sub fetch_Samples_Last_Live {
  $Neurio->fetch_Samples($start,$granularity,$end,$frequency,$perPage,$page);
 
    This method accepts the following parameters:
-     - start       : yyyy-mm-ddThh:mm:ssZ - Required
-                     specified using ISO8601 format
-     - granularity : seconds|minutes|hours|days - Required
-     - end         : yyyy-mm-ddThh:mm:ssZ - Optional
-                     specified using ISO8601 format
-     - frequency   : if the granularity is specified as 'minutes', then the 
-                     frequency must be a multiple of 5 - Optional
-     - perPage     : number of results per page - Optional
-     - page        : page number to return - Optional
+     - $start       : yyyy-mm-ddThh:mm:ssZ - Required
+                      specified using ISO8601 format
+     - $granularity : seconds|minutes|hours|days - Required
+     - $end         : yyyy-mm-ddThh:mm:ssZ - Optional
+                      specified using ISO8601 format
+     - $frequency   : if the granularity is specified as 'minutes', then the 
+                      frequency must be a multiple of 5 - Optional
+     - $perPage     : number of results per page - Optional
+     - $page        : page number to return - Optional
  
  Returns an array of Perl data structures on success
      $VAR1 = [
@@ -390,51 +392,51 @@ sub fetch_Samples {
  $Neurio->fetch_Samples_Full($start,$granularity,$end,$frequency,$perPage,$page);
 
    This method accepts the following parameters:
-     - start       : yyyy-mm-ddThh:mm:ssZ - Required
-                     specified using ISO8601 format
-     - granularity : seconds|minutes|hours|days - Required
-     - end         : yyyy-mm-ddThh:mm:ssZ - Optional
-                     specified using ISO8601 format
-     - frequency   : an integer - Optional
-     - perPage     : number of results per page - Optional
-     - page        : page number to return - Optional
+     - $start       : yyyy-mm-ddThh:mm:ssZ - Required
+                      specified using ISO8601 format
+     - $granularity : seconds|minutes|hours|days - Required
+     - $end         : yyyy-mm-ddThh:mm:ssZ - Optional
+                      specified using ISO8601 format
+     - $frequency   : an integer - Optional
+     - $perPage     : number of results per page - Optional
+     - $page        : page number to return - Optional
  
  Returns an array of Perl data structures on success
- $VAR1 = [
-          {
-            'timestamp' => '2014-06-16T19:20:21.000Z',
-            'channelSamples' => [
-                                  {
-                                    'voltage' => '123.19',
-                                    'power' => 129,
-                                    'name' => '1',
-                                    'energyExported' => 27,
-                                    'channelType' => 'phase_a',
-                                    'energyImported' => 2682910899,
-                                    'reactivePower' => 41
-                                  },
-                                  {
-                                    'voltage' => '123.94',
-                                    'power' => 199,
-                                    'name' => '2',
-                                    'energyExported' => 6,
-                                    'channelType' => 'phase_b',
-                                    'energyImported' => 3296564362,
-                                    'reactivePower' => -45
-                                  },
-                                  {
-                                    'voltage' => '123.57',
-                                    'power' => 327,
-                                    'name' => '3',
-                                    'energyExported' => 10,
-                                    'channelType' => 'consumption',
-                                    'energyImported' => 5979475235,
-                                    'reactivePower' => -4
-                                  }
-                                ]
-          },
-          ...
-         ]
+ [
+  {
+    'timestamp' => '2014-06-16T19:20:21.000Z',
+    'channelSamples' => [
+                          {
+                            'voltage' => '123.19',
+                            'power' => 129,
+                            'name' => '1',
+                            'energyExported' => 27,
+                            'channelType' => 'phase_a',
+                            'energyImported' => 2682910899,
+                            'reactivePower' => 41
+                          },
+                          {
+                            'voltage' => '123.94',
+                            'power' => 199,
+                            'name' => '2',
+                            'energyExported' => 6,
+                            'channelType' => 'phase_b',
+                            'energyImported' => 3296564362,
+                            'reactivePower' => -45
+                          },
+                          {
+                            'voltage' => '123.57',
+                            'power' => 327,
+                            'name' => '3',
+                            'energyExported' => 10,
+                            'channelType' => 'consumption',
+                            'energyImported' => 5979475235,
+                            'reactivePower' => -4
+                          }
+                        ]
+  },
+  ...
+ ]
  Returns 0 on failure
  
 =cut
@@ -489,15 +491,15 @@ sub fetch_Samples_Full {
    $Neurio->fetch_Stats_Energy($start,$granularity,$end,$frequency,$perPage,$page);
 
    This method accepts the following parameters:
-     - start       : yyyy-mm-ddThh:mm:ssZ - Required
-                     specified using ISO8601 format
-     - granularity : minutes|hours|days|months - Required
-     - end         : yyyy-mm-ddThh:mm:ssZ - Optional
-                     specified using ISO8601 format
-     - frequency   : if the granularity is specified as 'minutes', then the 
-                     frequency must be a multiple of 5 - Optional
-     - perPage     : number of results per page - Optional
-     - page        : page number to return - Optional
+     - $start       : yyyy-mm-ddThh:mm:ssZ - Required
+                      specified using ISO8601 format
+     - $granularity : minutes|hours|days|months - Required
+     - $end         : yyyy-mm-ddThh:mm:ssZ - Optional
+                      specified using ISO8601 format
+     - $frequency   : if the granularity is specified as 'minutes', then the 
+                      frequency must be a multiple of 5 - Optional
+     - $perPage     : number of results per page - Optional
+     - $page        : page number to return - Optional
  
  Returns a Perl data structure containing all the raw data
  Returns 0 on failure
@@ -665,14 +667,14 @@ sub fetch_Appliances_Specific {
    This method accepts the following parameters:
       - $location_Id  : id of a location - Required
       - $appliance_id : id of the appliance - Required
-      - start         : yyyy-mm-ddThh:mm:ssZ - Required
+      - $start         : yyyy-mm-ddThh:mm:ssZ - Required
                         specified using ISO8601 format
-      - granularity   : seconds|minutes|hours|days - Required
-      - end           : yyyy-mm-ddThh:mm:ssZ - Required
+      - $granularity   : seconds|minutes|hours|days - Required
+      - $end           : yyyy-mm-ddThh:mm:ssZ - Required
                         specified using ISO8601 format
-      - frequency     : an integer - Required
-      - perPage       : number of results per page - Optional
-      - page          : page number to return - Optional
+      - $frequency     : an integer - Required
+      - $perPage       : number of results per page - Optional
+      - $page          : page number to return - Optional
  
  Returns an array of Perl data structures on success
 $VAR1 = [
@@ -769,78 +771,172 @@ sub fetch_Appliances_Stats {
 
 
 #******************************************************************************
-=head2 fetch_Appliances_Events - Fetch events for a specific appliance
+=head2 fetch_Appliances_Events_by_Location - Fetch events for a specific location
+
+ Retrieves events for a specific location.  An event is an interval when an 
+ appliance was in use.
+ 
+ The applicance_id parameter can be determined by using the fetch_Appliance method 
+ which returns a list of appliances with their IDs.
+ 
+ The function has the following 2 possibilities for parameters:
+
+   $Neurio->fetch_Appliances_Events_by_Location($location_id, $start,$end,$perPage,$page);
+   $Neurio->fetch_Appliances_Events_by_Location($location_id, $since,$perPage,$page);
+
+   This method accepts the following parameters:
+      - $location_Id  : id of a location - Required
+      - $start        : yyyy-mm-ddThh:mm:ssZ - Required
+                        specified using ISO8601 format
+      - $end          : yyyy-mm-ddThh:mm:ssZ - Required
+                        specified using ISO8601 format
+      - $since        : yyyy-mm-ddThh:mm:ssZ - Required
+                        specified using ISO8601 format
+      - $perPage      : number of results per page - Optional
+      - $page         : page number to return - Optional
+ 
+ Returns an array of Perl data structures on success
+  [
+    {
+        "id" : "1cRsH7KQTeONMzjSuRJ2aw",
+        "createdAt" : "2014-04-21T22:28:32Z",
+        "updatedAt" : "2014-04-21T22:45:32Z",
+        "appliance" : {
+            "id" : "2SMROBfiTA6huhV7Drrm1g",
+            "name" : "television",
+            "label" : "upstairs TV",
+            "tags" : ["bedroom_television", "42 inch LED"],
+            "locationId" : "0qX7nB-8Ry2bxIMTK0EmXw"
+        },
+        "start" : "2014-04-21T05:26:10.785Z",
+        "end" : "2014-04-21T05:36:00.547Z",
+        "guesses" : {"dryer1" : 0.78, "dishwasher_2014" : 0.12},
+        "energy" : 247896,
+        "averagePower" : 122,
+        "groupIds" : [ "2pMROafiTA6huhV7Drrm1g", "4SmROBfiTA6huhV7Drrm1h" ],
+        "cycleCount" : 5,
+        "isRunning" : false
+    },
+    ...
+]
+  Returns 0 on failure
+ 
+=cut
+
+sub fetch_Appliances_Events_by_Location {
+    my ($self,$location_id,$start,$end,$perPage,$page) = @_;
+    my ($url);
+    
+    # make sure $location_id is defined
+    if (!defined $location_id) {
+      print "\nNeurio->fetch_Appliances_Events_by_Location(): \$location_id is a required parameter\n\n" if ($self->{'debug'});
+      $self->{'last_code'}   = '0';
+      $self->{'last_reason'} = 'Neurio->fetch_Appliances_Events_by_Location(): \$location_id is a required parameter';
+      return 0;
+    }
+    # make sure $start (or $since) is defined
+    if (!defined $start) {
+      print "\nNeurio->fetch_Appliances_Events_by_Location(): \$start is a required parameter\n\n" if ($self->{'debug'});
+      $self->{'last_code'}   = '0';
+      $self->{'last_reason'} = 'Neurio->fetch_Appliances_Events_by_Location(): \$start is a required parameter';
+      return 0;
+    }
+    
+    # check if $end is in ISO8601 format.  If it is, then it is $end.  If not, then $since was specified
+    if (defined $end) {
+      if (defined eval{DateTime::Format::ISO8601->parse_datetime($end)}) {
+        $url = $self->{'Appliances_Events_url'}."?locationId=$location_id&start=$start&end=$end";
+      } else {
+        $perPage = $end;
+        $page    = $perPage;
+        $url     = $self->{'Appliances_Events_url'}."?locationId=$location_id&since=$start";
+      }
+    } else {
+      $url = $self->{'Appliances_Events_url'}."?locationId=$location_id&since=$start";
+    }
+    
+    # if optional parameter is defined, add it
+    if (defined $perPage) {
+      $url = $url . "&perPage=$perPage";
+    }
+    # if optional parameter is defined, add it
+    if (defined $page) {
+      $url = $url . "&page=$page";
+    }
+
+    return $self->__process_get($url);
+}
+
+
+#******************************************************************************
+=head2 fetch_Appliances_Events_by_Appliance - Fetch events for a specific appliance
 
  Retrieves events for a specific appliance.  An event is an interval when an 
  appliance was in use.
  
- The applicance_id parameter is determined by using the fetch_Appliance method 
- which returns a list of appliances with their IDs
-
-   $Neurio->fetch_Appliances_Events($location_id,$appliance_id,$start,$end,$perPage,$page);
+ The applicance_id parameter can be determined by using the fetch_Appliance method 
+ which returns a list of appliances with their IDs.
+ 
+   $Neurio->fetch_Appliances_Events_by_Appliance($appliance_id,$start,$end,$perPage,$page);
 
    This method accepts the following parameters:
-      - $location_Id  : id of a location - Required
       - $appliance_id : id of the appliance - Required
-      - start         : yyyy-mm-ddThh:mm:ssZ - Required
+      - $start        : yyyy-mm-ddThh:mm:ssZ - Required
                         specified using ISO8601 format
-      - end           : yyyy-mm-ddThh:mm:ssZ - Required
+      - $end          : yyyy-mm-ddThh:mm:ssZ - Required
                         specified using ISO8601 format
-      - perPage       : number of results per page - Optional
-      - page          : page number to return - Optional
+      - $since        : yyyy-mm-ddThh:mm:ssZ - Required
+                        specified using ISO8601 format
+      - $perPage      : number of results per page - Optional
+      - $page         : page number to return - Optional
  
  Returns an array of Perl data structures on success
-$VAR1 = [
-          {
-            'energy' => 74124,
-            'averagePower' => '109',
-            'guesses' => {},
-            'end' => '2014-09-05T13:50:44.055Z',
-            'groupIds' => [
-                            'aaaaaaaaaaaaaaaaa'
-                          ],
-            'id' => 'fGol_nJ9Q06-8SsIJyHLlw',
-            'appliance' => {
-                             'locationId' => 'bbbbbbbbbbbbbbbbb-3',
-                             'name' => 'refrigerator',
-                             'id' => 'cccccccccccccccccc',
-                             'label' => '',
-                             'tags' => []
-                           },
-            'start' => '2014-09-05T13:39:20.115Z'
-          },
-          ......
-        ]
+ [
+    {
+        "id" : "1cRsH7KQTeONMzjSuRJ2aw",
+        "createdAt" : "2014-04-21T22:28:32Z",
+        "updatedAt" : "2014-04-21T22:45:32Z",
+        "appliance" : {
+            "id" : "2SMROBfiTA6huhV7Drrm1g",
+            "name" : "television",
+            "label" : "upstairs TV",
+            "tags" : ["bedroom_television", "42 inch LED"],
+            "locationId" : "0qX7nB-8Ry2bxIMTK0EmXw"
+        },
+        "start" : "2014-04-21T05:26:10.785Z",
+        "end" : "2014-04-21T05:36:00.547Z",
+        "guesses" : {"dryer1" : 0.78, "dishwasher_2014" : 0.12},
+        "energy" : 247896,
+        "averagePower" : 122,
+        "groupIds" : [ "2pMROafiTA6huhV7Drrm1g", "4SmROBfiTA6huhV7Drrm1h" ],
+        "cycleCount" : 5,
+        "isRunning" : false
+    },
+    ...
+ ]
  Returns 0 on failure
  
 =cut
 
-sub fetch_Appliances_Events {
-    my ($self,$location_id,$appliance_id,$start,$end,$perPage,$page) = @_;
+sub fetch_Appliances_Events_by_Appliance {
+    my ($self,$appliance_id,$start,$end,$perPage,$page) = @_;
     
-    # make sure $location_id is defined
-    if (!defined $location_id) {
-      print "\nNeurio->fetch_Appliances_Events(): \$location_id is a required parameter\n\n" if ($self->{'debug'});
-      $self->{'last_code'}   = '0';
-      $self->{'last_reason'} = 'Neurio->fetch_Appliances_Events(): \$location_id is a required parameters';
-      return 0;
-    }
     # make sure $appliance_id is defined
     if (!defined $appliance_id) {
-      print "\nNeurio->fetch_Appliances_Events(): \$appliance_id is a required parameter\n\n" if ($self->{'debug'});
+      print "\nNeurio->fetch_Appliances_Events_by_Appliance(): \$appliance_id is a required parameter\n\n" if ($self->{'debug'});
       $self->{'last_code'}   = '0';
-      $self->{'last_reason'} = 'Neurio->fetch_Appliances_Events(): \$appliance_id is a required parameters';
+      $self->{'last_reason'} = 'Neurio->fetch_Appliances_Events_by_Appliance(): \$appliance_id is a required parameters';
       return 0;
     }
     # make sure $start and $end are defined
     if ((!defined $start) || (!defined $end)) {
-      print "\nNeurio->fetch_Appliances_Events(): \$start and \$end are required parameters\n\n" if ($self->{'debug'});
+      print "\nNeurio->fetch_Appliances_Events_by_Appliance(): \$start and \$end are required parameters\n\n" if ($self->{'debug'});
       $self->{'last_code'}   = '0';
-      $self->{'last_reason'} = 'Neurio->fetch_Appliances_Events(): \$start and \$end are required parameters';
+      $self->{'last_reason'} = 'Neurio->fetch_Appliances_Events_by_Appliance(): \$start and \$end are required parameters';
       return 0;
     }
 
-    my $url = $self->{'Appliances_Events_url'}."?locationId=$location_id&appliance_id=$appliance_id&start=$start&end=$end";
+    my $url = $self->{'Appliances_Events_url'}."?applianceId=$appliance_id&start=$start&end=$end";
     
     # if optional parameter is defined, add it
     if (defined $perPage) {
