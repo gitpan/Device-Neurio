@@ -18,7 +18,9 @@ our @ISA = qw(Exporter);
 
 our %EXPORT_TAGS = ( 'all' => [ qw(
     new connect fetch_Samples_Recent_Live fetch_Samples_Last_Live fetch_Samples 
-    fetch_Samples_Full fetch_Stats_Energy
+    fetch_Samples_Full fetch_Stats_Energy fetch_Appliances fetch_Appliances_Events_by_Appliance
+    fetch_Appliances_Events_by_Location fetch_Appliances_Specific fetch_Appliances_Stats
+    get_last_code get_last_exec_time get_last_reason
 ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
@@ -31,12 +33,14 @@ BEGIN
     use Time::Local;
     use JSON qw(decode_json encode_json);
     use MIME::Base64 (qw(encode_base64));
+    use Time::HiRes qw/gettimeofday/;
     use Data::Dumper;
   } else {
     use LWP::UserAgent;
     use Time::Local;
     use JSON qw(decode_json encode_json);
     use MIME::Base64 (qw(encode_base64));
+    use Time::HiRes qw/gettimeofday/;
     use Data::Dumper;
   }
 }
@@ -49,11 +53,11 @@ Device::Neurio - Methods for wrapping the Neurio API calls so that they are
 
 =head1 VERSION
 
-Version 0.14
+Version 0.15
 
 =cut
 
-our $VERSION = '0.14';
+our $VERSION = '0.15';
 
 #******************************************************************************
 =head1 SYNOPSIS
@@ -161,7 +165,8 @@ sub new {
     $self->{'Appliances_Events_url'}   = $self->{'base_url'}."/appliances/events";
     $self->{'last_code'}               = '';
     $self->{'last_reason'}             = '';
-    
+	$self->{'last_exec_time'}          = 0;
+	
     bless $self, $class;
     
     return $self;
@@ -986,6 +991,7 @@ sub dump_Object {
     print "debug                   : ".substr($self->{'debug'},                    0,120)."\n";
     print "last_code               : ".substr($self->{'last_code'},                0,120)."\n";
     print "last_reason             : ".substr($self->{'last_reason'},              0,120)."\n";
+    print "last_execution_time     : ".substr($self->{'last_exec_time'},           0,120)."\n";
     print "\n";
 }
 
@@ -1027,12 +1033,33 @@ sub get_last_code {
 }
 
 #******************************************************************************
-sub __process_get {
-    my $self     = shift;
-    my $url      = shift;
-	my $response = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
+=head2 get_last_exec_time - returns the execution time for the last fetch
 
-    $self->{'last_code'} = $response->code;
+ Returns the number of milliseconds it took for the last fetch call
+
+   $Neurio->get_last_exec_time();
+
+   This method accepts no parameters
+ 
+ Returns the number of milliseconds
+ 
+=cut
+
+sub get_last_exec_time {
+    my $self  = shift;
+    return $self->{'last_exec_time'};
+}
+
+#******************************************************************************
+sub __process_get {
+    my $self        = shift;
+    my $url         = shift;
+    my $time_before = gettimeofday;
+	my $response    = $self->{'ua'}->get($url,"Authorization"=>"Bearer ".$self->{'access_token'});
+    my $time_after  = gettimeofday;
+
+    $self->{'last_exec_time'} = eval{($time_after-$time_before)*1000};
+    $self->{'last_code'}      = $response->code;
 
     if (($response->code) eq '200') {
       $self->{'last_reason'} = '';
